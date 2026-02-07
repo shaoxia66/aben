@@ -1,43 +1,47 @@
 # Aben
 
-A cluster-controlled AI agent assistant system that automates computer operations.
+**多设备智能体协同平台** —— 自动化您的计算机操作集群。
 
-## Introduction
+## 简介
 
-Aben makes it easy to manage multiple AI assistant clusters. With simple configuration and an intuitive web interface, say goodbye to complex deployments and social media-based management.
+Aben 是一个专为管理多设备 AI 智能体集群而设计的协同平台。它不仅能统一管理多个节点，更能支持**跨设备协同任务**，将复杂流程分发至不同机器并行执行。通过直观的 Web 界面和极简配置，让您轻松驾驭分布式自动化集群。告别繁琐的部署流程和依赖社交软件的非正规管理方式，体验企业级的智能体集群管控。
 
-## Features
+## 核心特性
 
-- **Simple Configuration** — Client only needs server address and API key
-- **Easy Deployment** — One-click install, ready to use
-- **Visual Management** — Web UI to monitor all agents in real-time
-- **No Social Apps Required** — No dependency on WeChat/Telegram for management
+- **极简配置** — 客户端仅需服务器地址和 API Key 即可接入
+- **一键部署** — 快速安装，开箱即用，降低运维成本
+- **多设备协同** — 支持跨设备任务编排与分发，实现多节点并行处理与协作
+- **云端 Skills** — Skills 统一存储在云端，可随时下发至任意智能体节点
+- **可视化监控** — 通过 Web UI 实时监控所有智能体节点状态与任务进度
+- **独立自主** — 不依赖微信/Telegram 等第三方社交平台，数据更安全可控
+- **现代化架构** — 后端采用 DDD 领域驱动设计，前端采用 shadcn-ui 组件库
 
-## Architecture
+## 系统架构
 
 ```
-Python Client (N nodes)  ←→  Next.js Server  ←→  Next.js Admin (Web)
+Python 客户端 (N个节点)  ←→  Next.js 服务端  ←→  Next.js 管理后台 (Web)
 ```
 
-| Component | Tech Stack | Responsibility |
+| 组件 | 技术栈 | 职责 |
 |-----------|------------|----------------|
-| Client | Python | Execute automation tasks, report status |
-| Server | Next.js | API services, data storage, task scheduling |
-| Admin | Next.js | Web management UI, monitoring, task dispatch |
+| Client (客户端) | Python | 执行自动化任务，上报状态，作为智能体节点运行 |
+| Server (服务端) | Next.js (DDD) | 核心业务逻辑，API 服务，数据存储，任务调度与分发 |
+| Admin (管理台) | Next.js + shadcn-ui | 可视化管理界面，集群监控，任务编排 |
 
-## Why Aben?
+## 为什么选择 Aben?
 
-Compared to existing solutions like OpenClaw:
+相比 OpenClaw 等现有方案，Aben 专注于集群协同与易用性：
 
-| Pain Point | Aben |
+| 痛点 | Aben 解决方案 |
 |------------|------|
-| Complex configuration | ✅ Minimal setup |
-| Managed via social apps | ✅ Professional Web UI |
-| No visibility into status | ✅ Real-time monitoring |
-| Tedious deployment | ✅ One-click deploy |
+| 配置繁琐复杂 | ✅ 极简配置，快速接入 |
+| 依赖社交软件管理 | ✅ 专业独立的可视化 Web 管理台 |
+| 运行状态不可见 | ✅ 实时监控集群状态 |
+| 任务执行效率低 | ✅ 多设备并行协同处理 |
+| 部署维护困难 | ✅ 一键部署，轻松扩展 |
 
-## Target Users
+## 目标用户
 
-- Users managing automation tasks across multiple machines
-- Teams deploying AI assistants at scale
-- Developers seeking a simple and effective solution
+- 需要跨多台机器管理自动化任务的用户
+- 规模化部署 AI 助手的团队
+- 寻求简单高效、架构清晰的智能体解决方案的开发者
