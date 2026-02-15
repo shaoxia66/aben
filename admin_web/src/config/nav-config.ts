@@ -51,6 +51,11 @@ export const navItems: NavItem[] = [
         title: '客户端配置',
         url: '/dashboard/workspaces/clients',
         icon: 'laptop'
+      },
+      {
+        title: '会话管理',
+        url: '/dashboard/workspaces/sessions',
+        icon: 'post'
       }
     ]
   },

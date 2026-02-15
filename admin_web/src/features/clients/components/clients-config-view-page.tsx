@@ -411,12 +411,12 @@ export default function ClientsConfigViewPage() {
                     <TableCell className='text-xs'>{formatDateTime(row.lastSeenAt)}</TableCell>
                     <TableCell className='text-right'>
                       <div className='flex items-center justify-end gap-2'>
-                        <Button size='sm' variant='outline' onClick={() => openEdit(row)}>
+                        <Button size='sm'  onClick={() => openEdit(row)}>
                           编辑
                         </Button>
                         <Button
                           size='sm'
-                          variant='outline'
+                          
                           onClick={async () => {
                             try {
                               await navigator.clipboard.writeText(row.authKey);
@@ -425,7 +425,7 @@ export default function ClientsConfigViewPage() {
                         >
                           复制 key
                         </Button>
-                        <Button size='sm' variant='outline' onClick={() => void handleRotateKey(row)}>
+                        <Button size='sm'  onClick={() => void handleRotateKey(row)}>
                           重置 key
                         </Button>
                       </div>

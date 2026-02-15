@@ -112,6 +112,18 @@ export const useTaskStore = create<State & Actions>()(
       setTasks: (newTasks: Task[]) => set({ tasks: newTasks }),
       setCols: (newCols: Column[]) => set({ columns: newCols })
     }),
-    { name: 'task-store', skipHydration: true }
+    {
+      name: 'task-store',
+      version: 1,
+      migrate: (persisted) => {
+        const v = persisted as Partial<State> | undefined | null;
+        return {
+          tasks: Array.isArray(v?.tasks) ? (v?.tasks as Task[]) : initialTasks,
+          columns: Array.isArray(v?.columns) ? (v?.columns as Column[]) : defaultCols,
+          draggedTask: typeof v?.draggedTask === 'string' || v?.draggedTask === null ? v.draggedTask : null
+        } satisfies State;
+      },
+      skipHydration: true
+    }
   )
 );

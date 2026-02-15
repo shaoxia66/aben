@@ -79,6 +79,18 @@ export async function listClientsByTenantId(client: PoolClient, tenantId: string
   }));
 }
 
+export async function listEnabledClientIdsByTenantId(
+  client: PoolClient,
+  tenantId: string
+): Promise<string[]> {
+  const result = await client.query<{ id: string }>(
+    ["SELECT id", "FROM clients", "WHERE tenant_id = $1 AND status = 'enabled'", "ORDER BY created_at ASC"].join(" "),
+    [tenantId]
+  );
+
+  return result.rows.map((row) => row.id);
+}
+
 export async function createClientRow(
   client: PoolClient,
   params: {
