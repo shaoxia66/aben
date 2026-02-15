@@ -412,7 +412,7 @@ export default function AgentSessionsViewPage() {
                     <TableCell className='align-top text-xs'>{formatDateTime(s.lastMessageAt)}</TableCell>
                     <TableCell className='align-top text-xs'>{formatDateTime(s.createdAt)}</TableCell>
                     <TableCell className='text-right'>
-                      <Button variant='outline' size='sm' onClick={() => enterSession(s.id)}>
+                      <Button  size='sm' onClick={() => enterSession(s.id)}>
                         进入会话
                       </Button>
                     </TableCell>

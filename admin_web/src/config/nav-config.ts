@@ -86,20 +86,15 @@ export const navItems: NavItem[] = [
     isActive: false,
     items: []
   },
+
+
   {
-    title: 'Pro 功能',
-    url: '#', // Placeholder as there is no direct link for the parent
-    icon: 'pro',
-    isActive: true,
-    items: [
-      {
-        title: '专属功能',
-        url: '/dashboard/exclusive',
-        icon: 'exclusive',
-        shortcut: ['m', 'm']
-      }
-    ]
+    title: 'API配置',
+    url: '/dashboard/api-config',
+    icon: 'settings',
+    shortcut: ['m', 'm']
   },
+
   {
     title: '账户',
     url: '/dashboard/profile',

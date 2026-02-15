@@ -20,7 +20,7 @@ src/
 │
 ├── {domain}/                  # 领域模块（如 user/order/product）
 │   ├── domain/                # 领域层：实体、值对象、事件、异常
-│   ├── protocols/             # 协议层：仓储、服务接口
+│   ├── protocols/             # 协议层：仓储、服务接口。需要写清楚详细的备注，包括每个接口的参数、返回值
 │   ├── application/           # 应用层
 │   │   ├── commands/          # 命令处理器
 │   │   ├── queries/           # 查询处理器

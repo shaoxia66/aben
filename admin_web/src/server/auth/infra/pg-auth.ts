@@ -42,6 +42,19 @@ export type PgTenantMembershipDetails = PgTenantMembership & {
   tenantName: string;
 };
 
+export type PgTenantMember = {
+  userId: string;
+  email: string | null;
+  displayName: string | null;
+  isDisabled: boolean;
+  role: string;
+  status: PgTenantUser["status"];
+  invitedByUserId: string | null;
+  joinedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export function hashPassword(password: string) {
   const salt = randomBytes(16);
   const N = 16384;
@@ -349,4 +362,51 @@ export async function findFirstActiveMembershipForUser(
     role: row.role,
     status: row.status
   };
+}
+
+export async function listTenantMembersByTenantId(
+  client: PoolClient,
+  tenantId: string
+): Promise<PgTenantMember[]> {
+  const result = await client.query<{
+    user_id: string;
+    email: string | null;
+    display_name: string | null;
+    is_disabled: boolean;
+    role: string;
+    status: PgTenantUser["status"];
+    invited_by_user_id: string | null;
+    joined_at: Date | null;
+    created_at: Date;
+    updated_at: Date;
+  }>(
+    [
+      "SELECT tu.user_id, u.email, u.display_name, u.is_disabled, tu.role, tu.status, tu.invited_by_user_id, tu.joined_at, tu.created_at, tu.updated_at",
+      "FROM tenant_users tu",
+      "JOIN users u ON u.id = tu.user_id",
+      "WHERE tu.tenant_id = $1",
+      "AND tu.status IN ('invited','active','suspended')",
+      "ORDER BY",
+      "CASE",
+      "WHEN tu.role = 'owner' THEN 0",
+      "WHEN tu.role = 'admin' THEN 1",
+      "ELSE 2",
+      "END ASC,",
+      "COALESCE(u.display_name, u.email, u.id::text) ASC"
+    ].join(" "),
+    [tenantId]
+  );
+
+  return result.rows.map((row) => ({
+    userId: row.user_id,
+    email: row.email,
+    displayName: row.display_name,
+    isDisabled: row.is_disabled,
+    role: row.role,
+    status: row.status,
+    invitedByUserId: row.invited_by_user_id,
+    joinedAt: row.joined_at ? row.joined_at.toISOString() : null,
+    createdAt: row.created_at.toISOString(),
+    updatedAt: row.updated_at.toISOString()
+  }));
 }

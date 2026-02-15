@@ -12,7 +12,7 @@
     "start": "next start",
     "lint": "node -e \"const fs=require('fs');const path=require('path');const {spawnSync}=require('child_process');const cwd=process.cwd();const pnpmDir=path.join(cwd,'node_modules','.pnpm');const dirs=fs.readdirSync(pnpmDir,{withFileTypes:true}).filter(d=>d.isDirectory());const eslintDir=dirs.find(d=>d.name.startsWith('eslint@')&&fs.existsSync(path.join(pnpmDir,d.name,'node_modules','eslint','bin','eslint.js')));if(!eslintDir){console.error('eslint not found in node_modules/.pnpm');process.exit(1);}const eslintPath=path.join(pnpmDir,eslintDir.name,'node_modules','eslint','bin','eslint.js');const parserDirs=dirs.filter(d=>d.name.startsWith('@typescript-eslint+parser@'));const parserPath=parserDirs.map(d=>path.join(pnpmDir,d.name,'node_modules','@typescript-eslint','parser','dist','index.js')).find(p=>fs.existsSync(p));if(!parserPath){console.error('@typescript-eslint/parser not found in node_modules/.pnpm');process.exit(1);}const extra=process.argv.slice(2);const args=[eslintPath,'src','--no-eslintrc','--no-inline-config','--ext','.js,.jsx,.ts,.tsx','--parser',parserPath,...extra];const res=spawnSync(process.execPath,args,{stdio:'inherit'});process.exit(res.status??1);\"",
     "lint:fix": "pnpm lint --fix && bun format",
-    "lint:strict": "pnpm lint --max-warnings=0",
+    "lint:strict": "pnpm lint -- --max-warnings=0",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "format": "prettier --write .",
     "format:check": "prettier -c -w .",
