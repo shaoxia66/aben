@@ -32,6 +32,7 @@ import { UserAvatarProfile } from '@/components/user-avatar-profile';
 import { navItems } from '@/config/nav-config';
 import { useMediaQuery } from '@/hooks/use-media-query';
 import { useFilteredNavItems } from '@/hooks/use-nav';
+import { fetchWithTenantRefresh, setStoredTenantId } from '@/lib/utils';
 import {
   IconBell,
   IconChevronRight,
@@ -74,6 +75,15 @@ export default function AppSidebar() {
   const [tenants, setTenants] = React.useState<TenantOption[]>([]);
   const [switchingTenantId, setSwitchingTenantId] = React.useState<string | null>(null);
 
+  const tenantAvatarUser: AvatarUser = React.useMemo(() => {
+    const tenantName = currentTenant?.name || '租户';
+    return {
+      imageUrl: '',
+      fullName: tenantName,
+      emailAddresses: [{ emailAddress: '' }]
+    };
+  }, [currentTenant?.name]);
+
   React.useEffect(() => {
     void isOpen;
   }, [isOpen]);
@@ -82,7 +92,7 @@ export default function AppSidebar() {
     let cancelled = false;
     (async () => {
       try {
-        const response = await fetch('/api/auth/me', { method: 'GET' });
+        const response = await fetchWithTenantRefresh('/api/auth/me', { method: 'GET' });
         const data = (await response.json().catch(() => null)) as any;
         if (!response.ok) return;
         const email = typeof data?.user?.email === 'string' ? data.user.email : '';
@@ -110,6 +120,7 @@ export default function AppSidebar() {
         });
         setTenants(normalizedTenants);
         setCurrentTenant(normalizedCurrentTenant);
+        setStoredTenantId(normalizedCurrentTenant?.id ?? null);
       } catch {
         if (cancelled) return;
         setUser({
@@ -146,9 +157,9 @@ export default function AppSidebar() {
           role: typeof t.role === 'string' ? t.role : '',
           status: typeof t.status === 'string' ? t.status : ''
         });
+        setStoredTenantId(t.id);
       }
-      router.refresh();
-      router.push('/dashboard/overview');
+      window.location.assign('/dashboard/overview');
     } finally {
       setSwitchingTenantId(null);
     }
@@ -236,7 +247,12 @@ export default function AppSidebar() {
                   size='lg'
                   className='data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground'
                 >
-                  <UserAvatarProfile className='h-8 w-8 rounded-lg' showInfo user={user} />
+                  <div className='flex flex-1 items-center gap-2'>
+                    <UserAvatarProfile className='h-8 w-8 rounded-lg' user={tenantAvatarUser} />
+                    <span className='truncate text-sm font-semibold'>
+                      {currentTenant?.name || '租户'}
+                    </span>
+                  </div>
                   <IconChevronsDown className='ml-auto size-4' />
                 </SidebarMenuButton>
               </DropdownMenuTrigger>
@@ -246,16 +262,7 @@ export default function AppSidebar() {
                 align='end'
                 sideOffset={4}
               >
-                <DropdownMenuLabel className='p-0 font-normal'>
-                  <div className='px-1 py-1.5'>
-                    <UserAvatarProfile className='h-8 w-8 rounded-lg' showInfo user={user} />
-                  </div>
-                </DropdownMenuLabel>
-                <DropdownMenuSeparator />
-
-                <DropdownMenuLabel className='text-muted-foreground'>
-                  当前租户：{currentTenant?.name || '未选择'}
-                </DropdownMenuLabel>
+                <DropdownMenuLabel>切换租户</DropdownMenuLabel>
                 <DropdownMenuGroup>
                   {tenants.length === 0 ? (
                     <DropdownMenuItem disabled>暂无可切换租户</DropdownMenuItem>
@@ -266,40 +273,15 @@ export default function AppSidebar() {
                         disabled={Boolean(switchingTenantId) || t.id === currentTenant?.id}
                         onClick={() => handleSwitchTenant(t.id)}
                       >
-                        <div className='flex w-full items-center justify-between gap-3'>
-                          <span className='truncate'>
-                            {t.name}
-                            {t.id === currentTenant?.id ? '（当前）' : ''}
-                          </span>
-                          <span className='text-muted-foreground truncate text-xs'>
-                            {t.slug}
-                          </span>
-                        </div>
+                        <span className='truncate'>
+                          {t.name}
+                          {t.id === currentTenant?.id ? '（当前）' : ''}
+                        </span>
                       </DropdownMenuItem>
                     ))
                   )}
                 </DropdownMenuGroup>
-                <DropdownMenuSeparator />
 
-                <DropdownMenuGroup>
-                  <DropdownMenuItem onClick={() => router.push('/dashboard/profile')}>
-                    <IconUserCircle className='mr-2 h-4 w-4' />
-                    Profile
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => router.push('/dashboard/billing')}>
-                    <IconCreditCard className='mr-2 h-4 w-4' />
-                    Billing
-                  </DropdownMenuItem>
-                  <DropdownMenuItem>
-                    <IconBell className='mr-2 h-4 w-4' />
-                    Notifications
-                  </DropdownMenuItem>
-                </DropdownMenuGroup>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={handleLogout}>
-                  <IconLogout className='mr-2 h-4 w-4' />
-                  退出登录
-                </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           </SidebarMenuItem>

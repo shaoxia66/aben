@@ -3,13 +3,12 @@ import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuLabel,
-  DropdownMenuSeparator,
   DropdownMenuTrigger
 } from '@/components/ui/dropdown-menu';
 import { UserAvatarProfile } from '@/components/user-avatar-profile';
+import { fetchWithTenantRefresh, setStoredTenantId } from '@/lib/utils';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 
@@ -26,22 +25,27 @@ export function UserNav() {
     fullName: '用户',
     emailAddresses: [{ emailAddress: '' }]
   });
+  const [tenantRole, setTenantRole] = useState<string>('');
 
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        const response = await fetch('/api/auth/me', { method: 'GET' });
+        const response = await fetchWithTenantRefresh('/api/auth/me', { method: 'GET' });
         const data = (await response.json().catch(() => null)) as any;
         if (!response.ok) return;
         const email = typeof data?.user?.email === 'string' ? data.user.email : '';
         const displayName = typeof data?.user?.displayName === 'string' ? data.user.displayName : null;
+        const role = typeof data?.tenant?.role === 'string' ? data.tenant.role : '';
+        const tenantId = typeof data?.tenant?.id === 'string' ? data.tenant.id : null;
         if (cancelled) return;
         setUser({
           imageUrl: '',
           fullName: displayName || email || '用户',
           emailAddresses: [{ emailAddress: email || '-' }]
         });
+        setTenantRole(role);
+        setStoredTenantId(tenantId);
       } catch {
         if (cancelled) return;
         setUser({
@@ -49,6 +53,7 @@ export function UserNav() {
           fullName: '用户',
           emailAddresses: [{ emailAddress: '' }]
         });
+        setTenantRole('');
       }
     })();
     return () => {
@@ -83,18 +88,12 @@ export function UserNav() {
             <p className='text-muted-foreground text-xs leading-none'>
               {user?.emailAddresses?.[0]?.emailAddress || ''}
             </p>
+            <p className='text-muted-foreground text-xs leading-none'>
+              角色：{tenantRole || '-'}
+            </p>
           </div>
         </DropdownMenuLabel>
-        <DropdownMenuSeparator />
-        <DropdownMenuGroup>
-          <DropdownMenuItem onClick={() => router.push('/dashboard/profile')}>
-            Profile
-          </DropdownMenuItem>
-          <DropdownMenuItem>Billing</DropdownMenuItem>
-          <DropdownMenuItem>Settings</DropdownMenuItem>
-          <DropdownMenuItem>New Team</DropdownMenuItem>
-        </DropdownMenuGroup>
-        <DropdownMenuSeparator />
+
         <DropdownMenuItem onClick={handleLogout}>
           退出登录
         </DropdownMenuItem>

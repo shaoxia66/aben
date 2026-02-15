@@ -16,7 +16,7 @@ description: 规范 PostgreSQL 建表 SQL（UUIDv7 主键、必需字段、索�
 ### 1) 主键与 ID 类型（强制）
 
 - 所有表主键必须使用 UUIDv7：
-  - `id UUID PRIMARY KEY DEFAULT uuid_generate_v7()`
+  - 仅支持 PostgreSQL 18+：`id UUID PRIMARY KEY DEFAULT uuidv7()`
 - 所有跨表引用字段一律使用 `UUID` 类型（例如 `tenant_id UUID NOT NULL`、`user_id UUID NOT NULL`）
 
 ### 2) 外键策略（默认不使用外键）
@@ -77,64 +77,15 @@ credits DECIMAL(12, 2) DEFAULT 0.00 NOT NULL
 ### 0) UUIDv7 依赖（强制）
 
 ```sql
-CREATE EXTENSION IF NOT EXISTS pgcrypto;
-
-CREATE OR REPLACE FUNCTION uuid_generate_v7()
-RETURNS uuid
-LANGUAGE plpgsql
-AS $$
-DECLARE
-  unix_ms bigint;
-  rand_bytes bytea;
-  b bytea;
-BEGIN
-  unix_ms := floor(extract(epoch from clock_timestamp()) * 1000)::bigint;
-  rand_bytes := gen_random_bytes(10);
-
-  b :=
-    set_byte(
-      set_byte(
-        set_byte(
-          set_byte(
-            set_byte(
-              set_byte(
-                set_byte(
-                  set_byte(
-                    set_byte(
-                      set_byte(
-                        set_byte(
-                          set_byte(
-                            set_byte(
-                              set_byte(
-                                set_byte(
-                                  set_byte(E'\\000\\000\\000\\000\\000\\000\\000\\000\\000\\000\\000\\000\\000\\000\\000\\000'::bytea,
-                                  0, (unix_ms >> 40) & 255),
-                                1, (unix_ms >> 32) & 255),
-                              2, (unix_ms >> 24) & 255),
-                            3, (unix_ms >> 16) & 255),
-                          4, (unix_ms >> 8) & 255),
-                        5, unix_ms & 255),
-                      6, (get_byte(rand_bytes, 0) & 15) | 112),
-                    7, get_byte(rand_bytes, 1)),
-                  8, (get_byte(rand_bytes, 2) & 63) | 128),
-                9, get_byte(rand_bytes, 3)),
-              10, get_byte(rand_bytes, 4)),
-            11, get_byte(rand_bytes, 5)),
-          12, get_byte(rand_bytes, 6)),
-        13, get_byte(rand_bytes, 7)),
-      14, get_byte(rand_bytes, 8)),
-    15, get_byte(rand_bytes, 9));
-
-  RETURN encode(b, 'hex')::uuid;
-END;
-$$;
+-- PostgreSQL 18+ 内置 uuidv7()，无需自定义函数或扩展
+SELECT uuidv7();
 ```
 
 ### 1) CREATE TABLE 语句（强制）
 
 ```sql
 CREATE TABLE table_name (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v7(),
+  id UUID PRIMARY KEY DEFAULT uuidv7(),
 
   -- 业务字段示例（默认无外键，仅保留 UUID 引用字段）
   tenant_id UUID NOT NULL,
@@ -184,58 +135,6 @@ COMMENT ON COLUMN table_name.some_field IS '字段用途描述';
 ## 完整示例
 
 ```sql
-CREATE EXTENSION IF NOT EXISTS pgcrypto;
-
-CREATE OR REPLACE FUNCTION uuid_generate_v7()
-RETURNS uuid
-LANGUAGE plpgsql
-AS $$
-DECLARE
-  unix_ms bigint;
-  rand_bytes bytea;
-  b bytea;
-BEGIN
-  unix_ms := floor(extract(epoch from clock_timestamp()) * 1000)::bigint;
-  rand_bytes := gen_random_bytes(10);
-
-  b :=
-    set_byte(
-      set_byte(
-        set_byte(
-          set_byte(
-            set_byte(
-              set_byte(
-                set_byte(
-                  set_byte(
-                    set_byte(
-                      set_byte(
-                        set_byte(
-                          set_byte(
-                            set_byte(
-                              set_byte(
-                                set_byte(
-                                  set_byte(E'\\000\\000\\000\\000\\000\\000\\000\\000\\000\\000\\000\\000\\000\\000\\000\\000'::bytea,
-                                  0, (unix_ms >> 40) & 255),
-                                1, (unix_ms >> 32) & 255),
-                              2, (unix_ms >> 24) & 255),
-                            3, (unix_ms >> 16) & 255),
-                          4, (unix_ms >> 8) & 255),
-                        5, unix_ms & 255),
-                      6, (get_byte(rand_bytes, 0) & 15) | 112),
-                    7, get_byte(rand_bytes, 1)),
-                  8, (get_byte(rand_bytes, 2) & 63) | 128),
-                9, get_byte(rand_bytes, 3)),
-              10, get_byte(rand_bytes, 4)),
-            11, get_byte(rand_bytes, 5)),
-          12, get_byte(rand_bytes, 6)),
-        13, get_byte(rand_bytes, 7)),
-      14, get_byte(rand_bytes, 8)),
-    15, get_byte(rand_bytes, 9));
-
-  RETURN encode(b, 'hex')::uuid;
-END;
-$$;
-
 CREATE OR REPLACE FUNCTION update_updated_at_column()
 RETURNS TRIGGER AS $$
 BEGIN
@@ -245,7 +144,7 @@ END;
 $$ language 'plpgsql';
 
 CREATE TABLE tasks (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v7(),
+  id UUID PRIMARY KEY DEFAULT uuidv7(),
 
   name VARCHAR(255) NOT NULL,
   description TEXT,

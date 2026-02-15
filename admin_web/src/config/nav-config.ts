@@ -45,8 +45,14 @@ export const navItems: NavItem[] = [
     title: '工作空间',
     url: '/dashboard/workspaces',
     icon: 'workspace',
-    isActive: false,
-    items: []
+    isActive: true,
+    items: [
+      {
+        title: '客户端配置',
+        url: '/dashboard/workspaces/clients',
+        icon: 'laptop'
+      }
+    ]
   },
   {
     title: '团队',
@@ -91,32 +97,9 @@ export const navItems: NavItem[] = [
   },
   {
     title: '账户',
-    url: '#', // Placeholder as there is no direct link for the parent
+    url: '/dashboard/profile',
     icon: 'account',
-    isActive: true,
-    items: [
-      {
-        title: '个人资料',
-        url: '/dashboard/profile',
-        icon: 'profile',
-        shortcut: ['m', 'm']
-      },
-      {
-        title: '账单',
-        url: '/dashboard/billing',
-        icon: 'billing',
-        shortcut: ['b', 'b'],
-        // Only show billing if in organization context
-        access: { requireOrg: true }
-        // Alternative: require billing management permission
-        // access: { requireOrg: true, permission: 'org:manage:billing' }
-      },
-      {
-        title: '登录',
-        shortcut: ['l', 'l'],
-        url: '/',
-        icon: 'login'
-      }
-    ]
+    isActive: false,
+    items: []
   }
 ];

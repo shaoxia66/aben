@@ -111,6 +111,30 @@ export async function findUserAuthByEmail(client: PoolClient, email: string): Pr
   };
 }
 
+export async function findUserAuthById(client: PoolClient, userId: string): Promise<PgUserAuth | null> {
+  const result = await client.query<{
+    id: string;
+    email: string | null;
+    is_disabled: boolean;
+    password_hash: string;
+    display_name: string | null;
+  }>(
+    "SELECT id, email, is_disabled, password_hash, display_name FROM users WHERE id = $1 LIMIT 1",
+    [userId]
+  );
+
+  const row = result.rows[0];
+  if (!row) return null;
+
+  return {
+    id: row.id,
+    email: row.email,
+    isDisabled: row.is_disabled,
+    passwordHash: row.password_hash,
+    displayName: row.display_name
+  };
+}
+
 export async function findUserProfileById(client: PoolClient, userId: string): Promise<PgUserProfile | null> {
   const result = await client.query<{
     id: string;
@@ -131,6 +155,16 @@ export async function findUserProfileById(client: PoolClient, userId: string): P
     isDisabled: row.is_disabled,
     displayName: row.display_name
   };
+}
+
+export async function updateUserPasswordHash(
+  client: PoolClient,
+  params: { userId: string; passwordHash: string }
+) {
+  await client.query("UPDATE users SET password_hash = $2 WHERE id = $1", [
+    params.userId,
+    params.passwordHash
+  ]);
 }
 
 export async function createUser(client: PoolClient, params: {
