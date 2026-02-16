@@ -17,9 +17,8 @@ export const runtime = "nodejs";
 const updateSchema = z.object({
   id: z.string().uuid().optional().nullable(),
   provider: z.enum(["openai", "anthropic", "deepseek", "qwen", "azure_openai", "custom"]),
-  name: z.string().max(255).optional().nullable(),
+  modelName: z.string().max(255).optional().nullable(),
   baseUrl: z.string().max(2000).optional().nullable(),
-  defaultModel: z.string().max(100).optional().nullable(),
   isDefault: z.boolean().optional(),
   status: z.enum(["enabled", "disabled"]).optional(),
   apiKey: z.string().optional().nullable()
@@ -29,11 +28,10 @@ function toSafeDto(row: {
   id: string;
   tenantId: string;
   provider: string;
-  name: string | null;
+  modelName: string | null;
   baseUrl: string | null;
   apiKey: string | null;
   apiKeyLast4: string | null;
-  defaultModel: string | null;
   isDefault: boolean;
   status: "enabled" | "disabled";
   createdAt: string;
@@ -42,9 +40,8 @@ function toSafeDto(row: {
   return {
     id: row.id,
     provider: row.provider,
-    name: row.name,
+    modelName: row.modelName,
     baseUrl: row.baseUrl,
-    defaultModel: row.defaultModel,
     isDefault: row.isDefault,
     status: row.status,
     hasApiKey: !!(row.apiKey && row.apiKey.trim()),
@@ -126,4 +123,3 @@ export async function DELETE(request: Request) {
     return NextResponse.json({ error: { code: "INTERNAL_ERROR", message: "服务器内部错误" } }, { status: 500 });
   }
 }
-

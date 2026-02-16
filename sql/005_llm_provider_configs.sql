@@ -4,11 +4,10 @@ CREATE TABLE llm_provider_configs (
   tenant_id UUID NOT NULL,
   provider VARCHAR(40) NOT NULL,
 
-  name VARCHAR(255),
+  model_name VARCHAR(255),
   base_url TEXT,
   api_key TEXT,
   api_key_last4 VARCHAR(4),
-  default_model VARCHAR(100),
   status VARCHAR(20) DEFAULT 'enabled' NOT NULL,
 
   created_by UUID,
@@ -35,11 +34,10 @@ COMMENT ON TABLE llm_provider_configs IS '租户大模型厂商配置表（厂�
 COMMENT ON COLUMN llm_provider_configs.id IS '主键';
 COMMENT ON COLUMN llm_provider_configs.tenant_id IS '租户 ID';
 COMMENT ON COLUMN llm_provider_configs.provider IS '厂商标识（如 openai/anthropic/deepseek/qwen/azure_openai/custom）';
-COMMENT ON COLUMN llm_provider_configs.name IS '展示名称（可为空）';
+COMMENT ON COLUMN llm_provider_configs.model_name IS '模型名称（可为空）';
 COMMENT ON COLUMN llm_provider_configs.base_url IS 'Base URL（可为空，使用 SDK 默认值）';
 COMMENT ON COLUMN llm_provider_configs.api_key IS 'API Key（明文；由管理员配置）';
 COMMENT ON COLUMN llm_provider_configs.api_key_last4 IS 'API Key 后 4 位（用于展示与确认）';
-COMMENT ON COLUMN llm_provider_configs.default_model IS '默认模型名（如 gpt-4o-mini/deepseek-chat 等）';
 COMMENT ON COLUMN llm_provider_configs.status IS '状态（enabled/disabled）';
 COMMENT ON COLUMN llm_provider_configs.created_by IS '创建人用户 ID';
 COMMENT ON COLUMN llm_provider_configs.updated_by IS '更新人用户 ID';

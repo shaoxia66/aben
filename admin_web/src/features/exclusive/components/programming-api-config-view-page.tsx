@@ -33,9 +33,8 @@ type Status = 'enabled' | 'disabled';
 type LlmConfigRow = {
   id: string;
   provider: string;
-  name: string | null;
+  modelName: string | null;
   baseUrl: string | null;
-  defaultModel: string | null;
   isDefault: boolean;
   status: Status;
   hasApiKey: boolean;
@@ -64,6 +63,10 @@ function providerLabel(provider: string) {
   return providerOptions.find((p) => p.value === provider)?.label ?? provider;
 }
 
+function statusLabel(status: Status) {
+  return status === 'enabled' ? '启用' : '禁用';
+}
+
 export default function ProgrammingApiConfigViewPage() {
   const [rows, setRows] = useState<LlmConfigRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -76,9 +79,8 @@ export default function ProgrammingApiConfigViewPage() {
   const [deletingSubmitting, setDeletingSubmitting] = useState(false);
 
   const [provider, setProvider] = useState<Provider>('deepseek');
-  const [name, setName] = useState('');
+  const [modelName, setModelName] = useState('');
   const [baseUrl, setBaseUrl] = useState('');
-  const [defaultModel, setDefaultModel] = useState('');
   const [isDefault, setIsDefault] = useState(false);
   const [enabled, setEnabled] = useState(true);
   const [apiKey, setApiKey] = useState('');
@@ -105,9 +107,8 @@ export default function ProgrammingApiConfigViewPage() {
           return {
             id: it.id,
             provider: it.provider,
-            name: typeof it.name === 'string' ? it.name : null,
+            modelName: typeof it.modelName === 'string' ? it.modelName : null,
             baseUrl: typeof it.baseUrl === 'string' ? it.baseUrl : null,
-            defaultModel: typeof it.defaultModel === 'string' ? it.defaultModel : null,
             isDefault: !!it.isDefault,
             status: it.status,
             hasApiKey: !!it.hasApiKey,
@@ -141,9 +142,8 @@ export default function ProgrammingApiConfigViewPage() {
   function openCreate() {
     setEditing(null);
     setProvider('deepseek');
-    setName('');
+    setModelName('');
     setBaseUrl('');
-    setDefaultModel('');
     setIsDefault(false);
     setEnabled(true);
     setApiKey('');
@@ -156,9 +156,8 @@ export default function ProgrammingApiConfigViewPage() {
     setEditing(row);
     const p = (providerOptions.find((x) => x.value === row.provider)?.value ?? 'custom') as Provider;
     setProvider(p);
-    setName(row.name ?? '');
+    setModelName(row.modelName ?? '');
     setBaseUrl(row.baseUrl ?? '');
-    setDefaultModel(row.defaultModel ?? '');
     setIsDefault(!!row.isDefault);
     setEnabled(row.status === 'enabled');
     setApiKey('');
@@ -203,9 +202,8 @@ export default function ProgrammingApiConfigViewPage() {
       const payload: any = {
         id: editing?.id ?? null,
         provider,
-        name: name.trim() ? name.trim() : null,
+        modelName: modelName.trim() ? modelName.trim() : null,
         baseUrl: baseUrl.trim() ? baseUrl.trim() : null,
-        defaultModel: defaultModel.trim() ? defaultModel.trim() : null,
         isDefault,
         status: enabled ? 'enabled' : 'disabled'
       };
@@ -241,8 +239,8 @@ export default function ProgrammingApiConfigViewPage() {
       <div className='space-y-6'>
         <div className='flex items-start justify-between gap-3'>
           <div>
-            <h1 className='text-3xl font-bold tracking-tight'>编程 API 配置</h1>
-            <p className='text-muted-foreground'>为当前租户配置大模型厂商、Base URL、API Key 与默认模型。</p>
+            <h1 className='text-3xl font-bold tracking-tight'>API 配置</h1>
+            <p className='text-muted-foreground'>为当前租户配置大模型厂商、Base URL、API Key 与模型。</p>
           </div>
           <Button onClick={() => openCreate()} disabled={loading}>
             新增配置
@@ -260,11 +258,10 @@ export default function ProgrammingApiConfigViewPage() {
             <TableHeader>
               <TableRow>
                 <TableHead>厂商</TableHead>
-                <TableHead>名称</TableHead>
+                <TableHead>模型</TableHead>
                 <TableHead>默认</TableHead>
                 <TableHead>状态</TableHead>
                 <TableHead>Base URL</TableHead>
-                <TableHead>默认模型</TableHead>
                 <TableHead>Key</TableHead>
                 <TableHead>更新时间</TableHead>
                 <TableHead className='text-right'>操作</TableHead>
@@ -273,13 +270,13 @@ export default function ProgrammingApiConfigViewPage() {
             <TableBody>
               {loading ? (
                 <TableRow>
-                  <TableCell colSpan={9} className='text-muted-foreground py-8 text-center text-sm'>
+                  <TableCell colSpan={8} className='text-muted-foreground py-8 text-center text-sm'>
                     加载中…
                   </TableCell>
                 </TableRow>
               ) : sorted.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={9} className='text-muted-foreground py-8 text-center text-sm'>
+                  <TableCell colSpan={8} className='text-muted-foreground py-8 text-center text-sm'>
                     暂无配置
                   </TableCell>
                 </TableRow>
@@ -287,11 +284,10 @@ export default function ProgrammingApiConfigViewPage() {
                 sorted.map((row) => (
                   <TableRow key={row.id}>
                     <TableCell className='font-medium'>{providerLabel(row.provider)}</TableCell>
-                    <TableCell className='max-w-[220px] whitespace-normal break-words'>{row.name ?? '-'}</TableCell>
+                    <TableCell className='max-w-[220px] whitespace-normal break-words'>{row.modelName ?? '-'}</TableCell>
                     <TableCell className='text-xs'>{row.isDefault ? '是' : '-'}</TableCell>
-                    <TableCell>{row.status}</TableCell>
+                    <TableCell>{statusLabel(row.status)}</TableCell>
                     <TableCell className='max-w-[360px] whitespace-normal break-words'>{row.baseUrl ?? '-'}</TableCell>
-                    <TableCell className='max-w-[220px] whitespace-normal break-words'>{row.defaultModel ?? '-'}</TableCell>
                     <TableCell className='font-mono text-xs'>
                       {row.hasApiKey ? (row.apiKeyLast4 ? `****${row.apiKeyLast4}` : '已配置') : '未配置'}
                     </TableCell>
@@ -353,7 +349,7 @@ export default function ProgrammingApiConfigViewPage() {
                 <Label>状态</Label>
                 <div className='flex items-center gap-3 pt-2'>
                   <Switch checked={enabled} onCheckedChange={(v) => setEnabled(!!v)} />
-                  <span className='text-sm text-muted-foreground'>{enabled ? 'enabled' : 'disabled'}</span>
+                  <span className='text-sm text-muted-foreground'>{enabled ? '启用' : '禁用'}</span>
                 </div>
               </div>
             </div>
@@ -367,19 +363,14 @@ export default function ProgrammingApiConfigViewPage() {
             </div>
 
             <div className='grid gap-2'>
-              <Label>名称</Label>
-              <Input value={name} onChange={(e) => setName(e.target.value)} placeholder='可选，例如：主账号' />
+              <Label>模型名称</Label>
+              <Input value={modelName} onChange={(e) => setModelName(e.target.value)} placeholder='可选，例如：deepseek-chat / gpt-4o-mini' />
             </div>
 
             <div className='grid gap-2'>
               <Label>Base URL</Label>
               <Input value={baseUrl} onChange={(e) => setBaseUrl(e.target.value)} placeholder='可选，例如：https://api.openai.com/v1' />
               <div className='text-muted-foreground text-xs'>留空表示使用 SDK 默认值（如厂商默认网关）。</div>
-            </div>
-
-            <div className='grid gap-2'>
-              <Label>默认模型</Label>
-              <Input value={defaultModel} onChange={(e) => setDefaultModel(e.target.value)} placeholder='可选，例如：deepseek-chat / gpt-4o-mini' />
             </div>
 
             <div className='grid gap-2'>
@@ -439,7 +430,7 @@ export default function ProgrammingApiConfigViewPage() {
             <AlertDialogTitle>确认删除？</AlertDialogTitle>
             <AlertDialogDescription>
               {deleting
-                ? `将删除「${providerLabel(deleting.provider)}${deleting.name ? ` / ${deleting.name}` : ''}」这条配置。此操作不可撤销。`
+                ? `将删除「${providerLabel(deleting.provider)}${deleting.modelName ? ` / ${deleting.modelName}` : ''}」这条配置。此操作不可撤销。`
                 : '此操作不可撤销。'}
             </AlertDialogDescription>
           </AlertDialogHeader>

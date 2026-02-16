@@ -16,7 +16,7 @@ export async function getDeepSeekRuntimeConfig(params: { tenantId: string }): Pr
     return {
       apiKey: defaultCfg.apiKey,
       baseUrl: defaultCfg.baseUrl?.trim() ? defaultCfg.baseUrl.trim() : null,
-      model: defaultCfg.defaultModel?.trim() ? defaultCfg.defaultModel.trim() : "deepseek-chat"
+      model: defaultCfg.modelName?.trim() ? defaultCfg.modelName.trim() : "deepseek-chat"
     };
   }
 
@@ -25,7 +25,7 @@ export async function getDeepSeekRuntimeConfig(params: { tenantId: string }): Pr
     return {
       apiKey: cfg.apiKey,
       baseUrl: cfg.baseUrl?.trim() ? cfg.baseUrl.trim() : null,
-      model: cfg.defaultModel?.trim() ? cfg.defaultModel.trim() : "deepseek-chat"
+      model: cfg.modelName?.trim() ? cfg.modelName.trim() : "deepseek-chat"
     };
   }
 

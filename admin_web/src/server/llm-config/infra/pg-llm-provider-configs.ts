@@ -4,11 +4,10 @@ export type PgLlmProviderConfig = {
   id: string;
   tenantId: string;
   provider: string;
-  name: string | null;
+  modelName: string | null;
   baseUrl: string | null;
   apiKey: string | null;
   apiKeyLast4: string | null;
-  defaultModel: string | null;
   isDefault: boolean;
   status: "enabled" | "disabled";
   createdBy: string | null;
@@ -22,11 +21,10 @@ function mapRow(row: {
   id: string;
   tenant_id: string;
   provider: string;
-  name: string | null;
+  model_name: string | null;
   base_url: string | null;
   api_key: string | null;
   api_key_last4: string | null;
-  default_model: string | null;
   is_default: boolean;
   status: PgLlmProviderConfig["status"];
   created_by: string | null;
@@ -39,11 +37,10 @@ function mapRow(row: {
     id: row.id,
     tenantId: row.tenant_id,
     provider: row.provider,
-    name: row.name,
+    modelName: row.model_name,
     baseUrl: row.base_url,
     apiKey: row.api_key,
     apiKeyLast4: row.api_key_last4,
-    defaultModel: row.default_model,
     isDefault: !!row.is_default,
     status: row.status,
     createdBy: row.created_by,
@@ -62,11 +59,10 @@ export async function listLlmProviderConfigsByTenantId(
     id: string;
     tenant_id: string;
     provider: string;
-    name: string | null;
+    model_name: string | null;
     base_url: string | null;
     api_key: string | null;
     api_key_last4: string | null;
-    default_model: string | null;
     is_default: boolean;
     status: PgLlmProviderConfig["status"];
     created_by: string | null;
@@ -76,7 +72,7 @@ export async function listLlmProviderConfigsByTenantId(
     extra: unknown;
   }>(
     [
-      "SELECT id, tenant_id, provider, name, base_url, api_key, api_key_last4, default_model, is_default, status, created_by, updated_by, created_at, updated_at, extra",
+      "SELECT id, tenant_id, provider, model_name, base_url, api_key, api_key_last4, is_default, status, created_by, updated_by, created_at, updated_at, extra",
       "FROM llm_provider_configs",
       "WHERE tenant_id = $1",
       "ORDER BY provider ASC, is_default DESC, updated_at DESC, created_at DESC"
@@ -95,11 +91,10 @@ export async function findLlmProviderConfigByTenantIdAndProvider(
     id: string;
     tenant_id: string;
     provider: string;
-    name: string | null;
+    model_name: string | null;
     base_url: string | null;
     api_key: string | null;
     api_key_last4: string | null;
-    default_model: string | null;
     is_default: boolean;
     status: PgLlmProviderConfig["status"];
     created_by: string | null;
@@ -109,7 +104,7 @@ export async function findLlmProviderConfigByTenantIdAndProvider(
     extra: unknown;
   }>(
     [
-      "SELECT id, tenant_id, provider, name, base_url, api_key, api_key_last4, default_model, is_default, status, created_by, updated_by, created_at, updated_at, extra",
+      "SELECT id, tenant_id, provider, model_name, base_url, api_key, api_key_last4, is_default, status, created_by, updated_by, created_at, updated_at, extra",
       "FROM llm_provider_configs",
       "WHERE tenant_id = $1 AND provider = $2",
       "ORDER BY is_default DESC, updated_at DESC, created_at DESC",
@@ -129,9 +124,8 @@ export async function saveLlmProviderConfig(
     id: string | null;
     tenantId: string;
     provider: string;
-    name: string | null;
+    modelName: string | null;
     baseUrl: string | null;
-    defaultModel: string | null;
     shouldUpdateIsDefault: boolean;
     isDefault: boolean;
     status: PgLlmProviderConfig["status"];
@@ -146,11 +140,10 @@ export async function saveLlmProviderConfig(
       id: string;
       tenant_id: string;
       provider: string;
-      name: string | null;
+      model_name: string | null;
       base_url: string | null;
       api_key: string | null;
       api_key_last4: string | null;
-      default_model: string | null;
       is_default: boolean;
       status: PgLlmProviderConfig["status"];
       created_by: string | null;
@@ -161,18 +154,17 @@ export async function saveLlmProviderConfig(
     }>(
       [
         "INSERT INTO llm_provider_configs",
-        "(tenant_id, provider, name, base_url, api_key, api_key_last4, default_model, is_default, status, created_by, updated_by)",
-        "VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)",
-        "RETURNING id, tenant_id, provider, name, base_url, api_key, api_key_last4, default_model, is_default, status, created_by, updated_by, created_at, updated_at, extra"
+        "(tenant_id, provider, model_name, base_url, api_key, api_key_last4, is_default, status, created_by, updated_by)",
+        "VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)",
+        "RETURNING id, tenant_id, provider, model_name, base_url, api_key, api_key_last4, is_default, status, created_by, updated_by, created_at, updated_at, extra"
       ].join(" "),
       [
         params.tenantId,
         params.provider,
-        params.name,
+        params.modelName,
         params.baseUrl,
         params.apiKey,
         params.apiKeyLast4,
-        params.defaultModel,
         params.shouldUpdateIsDefault ? params.isDefault : false,
         params.status,
         params.userId,
@@ -189,11 +181,10 @@ export async function saveLlmProviderConfig(
     id: string;
     tenant_id: string;
     provider: string;
-    name: string | null;
+    model_name: string | null;
     base_url: string | null;
     api_key: string | null;
     api_key_last4: string | null;
-    default_model: string | null;
     is_default: boolean;
     status: PgLlmProviderConfig["status"];
     created_by: string | null;
@@ -206,22 +197,20 @@ export async function saveLlmProviderConfig(
       "UPDATE llm_provider_configs",
       "SET",
       "provider = $1,",
-      "name = $2,",
+      "model_name = $2,",
       "base_url = $3,",
-      "default_model = $4,",
-      "status = $5,",
-      "updated_by = $6,",
-      "api_key = CASE WHEN $7 THEN $8 ELSE llm_provider_configs.api_key END,",
-      "api_key_last4 = CASE WHEN $7 THEN $9 ELSE llm_provider_configs.api_key_last4 END,",
-      "is_default = CASE WHEN $10 THEN $11 ELSE llm_provider_configs.is_default END",
-      "WHERE tenant_id = $12 AND id = $13",
-      "RETURNING id, tenant_id, provider, name, base_url, api_key, api_key_last4, default_model, is_default, status, created_by, updated_by, created_at, updated_at, extra"
+      "status = $4,",
+      "updated_by = $5,",
+      "api_key = CASE WHEN $6 THEN $7 ELSE llm_provider_configs.api_key END,",
+      "api_key_last4 = CASE WHEN $6 THEN $8 ELSE llm_provider_configs.api_key_last4 END,",
+      "is_default = CASE WHEN $9 THEN $10 ELSE llm_provider_configs.is_default END",
+      "WHERE tenant_id = $11 AND id = $12",
+      "RETURNING id, tenant_id, provider, model_name, base_url, api_key, api_key_last4, is_default, status, created_by, updated_by, created_at, updated_at, extra"
     ].join(" "),
     [
       params.provider,
-      params.name,
+      params.modelName,
       params.baseUrl,
-      params.defaultModel,
       params.status,
       params.userId,
       params.shouldUpdateApiKey,
@@ -256,11 +245,10 @@ export async function setDefaultLlmProviderConfigById(
     id: string;
     tenant_id: string;
     provider: string;
-    name: string | null;
+    model_name: string | null;
     base_url: string | null;
     api_key: string | null;
     api_key_last4: string | null;
-    default_model: string | null;
     is_default: boolean;
     status: PgLlmProviderConfig["status"];
     created_by: string | null;
@@ -273,7 +261,7 @@ export async function setDefaultLlmProviderConfigById(
       "UPDATE llm_provider_configs",
       "SET is_default = TRUE",
       "WHERE tenant_id = $1 AND id = $2",
-      "RETURNING id, tenant_id, provider, name, base_url, api_key, api_key_last4, default_model, is_default, status, created_by, updated_by, created_at, updated_at, extra"
+      "RETURNING id, tenant_id, provider, model_name, base_url, api_key, api_key_last4, is_default, status, created_by, updated_by, created_at, updated_at, extra"
     ].join(" "),
     [params.tenantId, params.configId]
   );
@@ -291,11 +279,10 @@ export async function findDefaultLlmProviderConfigByTenantId(
     id: string;
     tenant_id: string;
     provider: string;
-    name: string | null;
+    model_name: string | null;
     base_url: string | null;
     api_key: string | null;
     api_key_last4: string | null;
-    default_model: string | null;
     is_default: boolean;
     status: PgLlmProviderConfig["status"];
     created_by: string | null;
@@ -305,7 +292,7 @@ export async function findDefaultLlmProviderConfigByTenantId(
     extra: unknown;
   }>(
     [
-      "SELECT id, tenant_id, provider, name, base_url, api_key, api_key_last4, default_model, is_default, status, created_by, updated_by, created_at, updated_at, extra",
+      "SELECT id, tenant_id, provider, model_name, base_url, api_key, api_key_last4, is_default, status, created_by, updated_by, created_at, updated_at, extra",
       "FROM llm_provider_configs",
       "WHERE tenant_id = $1 AND is_default = TRUE",
       "ORDER BY updated_at DESC, created_at DESC",

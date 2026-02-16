@@ -23,9 +23,8 @@ const providerSchema = z.enum(["openai", "anthropic", "deepseek", "qwen", "azure
 const inputSchema = z.object({
   id: z.string().uuid().optional().nullable(),
   provider: providerSchema,
-  name: z.string().trim().max(255).optional().nullable(),
+  modelName: z.string().trim().max(255).optional().nullable(),
   baseUrl: z.string().trim().max(2000).optional().nullable(),
-  defaultModel: z.string().trim().max(100).optional().nullable(),
   isDefault: z.boolean().optional(),
   status: z.enum(["enabled", "disabled"]).optional(),
   apiKey: z.string().optional().nullable()
@@ -69,13 +68,12 @@ export async function upsertLlmProviderConfig(
 
   const provider = parsed.data.provider.trim();
   const id = typeof parsed.data.id === "string" && parsed.data.id.trim() ? parsed.data.id.trim() : null;
-  const name = normalizeOptionalText(parsed.data.name);
+  const modelName = normalizeOptionalText(parsed.data.modelName);
   const baseUrlInput = normalizeOptionalText(parsed.data.baseUrl);
   const baseUrl = normalizeBaseUrl(baseUrlInput);
   if (baseUrlInput && !baseUrl) {
     throw new UpsertLlmProviderConfigError("VALIDATION_ERROR", "Base URL 无效");
   }
-  const defaultModel = normalizeOptionalText(parsed.data.defaultModel);
   const status: PgLlmProviderConfig["status"] = parsed.data.status ?? "enabled";
 
   const shouldUpdateApiKey = !!raw && Object.prototype.hasOwnProperty.call(raw, "apiKey");
@@ -92,9 +90,8 @@ export async function upsertLlmProviderConfig(
       id,
       tenantId: params.tenantId,
       provider,
-      name,
+      modelName,
       baseUrl,
-      defaultModel,
       shouldUpdateIsDefault: applyInlineIsDefault,
       isDefault: false,
       status,

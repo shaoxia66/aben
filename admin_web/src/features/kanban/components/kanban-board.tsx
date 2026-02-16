@@ -1,312 +1,558 @@
 'use client';
-import { Fragment, useEffect, useMemo, useRef, useState } from 'react';
-import { createPortal } from 'react-dom';
-import { Task, useTaskStore } from '../utils/store';
-import { hasDraggableData } from '../utils';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { fetchWithTenantRefresh } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import {
-  Announcements,
-  DndContext,
-  DragOverlay,
-  MouseSensor,
-  TouchSensor,
-  UniqueIdentifier,
-  useSensor,
-  useSensors,
-  type DragEndEvent,
-  type DragOverEvent,
-  type DragStartEvent
-} from '@dnd-kit/core';
-import { SortableContext, arrayMove } from '@dnd-kit/sortable';
-import type { Column } from './board-column';
-import { BoardColumn, BoardContainer } from './board-column';
-import NewSectionDialog from './new-section-dialog';
-import { TaskCard } from './task-card';
-// import { coordinateGetter } from "./multipleContainersKeyboardPreset";
+  Drawer,
+  DrawerClose,
+  DrawerContent,
+  DrawerFooter,
+  DrawerHeader,
+  DrawerTitle
+} from '@/components/ui/drawer';
 
-const defaultCols = [
-  {
-    id: 'TODO' as const,
-    title: '待办'
-  },
-  {
-    id: 'IN_PROGRESS' as const,
-    title: '进行中'
-  },
-  {
-    id: 'DONE' as const,
-    title: '已完成'
-  }
-] satisfies Column[];
+type AgentTaskStatus = 'pending' | 'running' | 'succeeded' | 'failed';
+type AgentTaskLifecycle = 'open' | 'blocked' | 'canceled' | 'closed';
 
-export type ColumnId = (typeof defaultCols)[number]['id'];
+type TaskRow = {
+  id: string;
+  tenantId: string;
+  sessionId: string;
+  sessionTitle: string | null;
+  parentTaskId: string | null;
+  orderNo: number;
+  title: string;
+  goal: string | null;
+  acceptanceCriteria: string | null;
+  status: AgentTaskStatus;
+  lifecycle: AgentTaskLifecycle;
+  assignedClientId: string | null;
+  idempotencyKey: string | null;
+  input: unknown;
+  output: unknown;
+  createdAt: string;
+  updatedAt: string;
+  extra: unknown;
+};
+
+type TaskRunRow = {
+  id: string;
+  tenantId: string;
+  taskId: string;
+  runNo: number;
+  clientId: string;
+  status: AgentTaskStatus;
+  inputSnapshot: unknown;
+  outputSnapshot: unknown;
+  error: string | null;
+  startedAt: string | null;
+  finishedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  extra: unknown;
+};
+
+type TaskEventRow = {
+  id: string;
+  tenantId: string;
+  sessionId: string;
+  taskId: string | null;
+  runId: string | null;
+  type: string;
+  payload: unknown;
+  occurredAt: string;
+  createdAt: string;
+  updatedAt: string;
+  extra: unknown;
+};
+
+type TaskDetail = { task: TaskRow; runs: TaskRunRow[]; events: TaskEventRow[] };
+
+const statusColumns: Array<{ id: AgentTaskStatus; title: string }> = [
+  { id: 'pending', title: '待执行' },
+  { id: 'running', title: '执行中' },
+  { id: 'succeeded', title: '成功' },
+  { id: 'failed', title: '失败' }
+];
+
+const COLUMN_WIDTH = 350;
+const COLUMN_GAP = 16;
+const BOARD_PADDING_X = 16;
 
 export function KanbanBoard() {
-  // const [columns, setColumns] = useState<Column[]>(defaultCols);
-  const columns = useTaskStore((state) => state.columns);
-  const setColumns = useTaskStore((state) => state.setCols);
-  const pickedUpTaskColumn = useRef<ColumnId | 'TODO' | 'IN_PROGRESS' | 'DONE'>(
-    'TODO'
+  const [tasks, setTasks] = useState<TaskRow[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  const boardOuterRef = useRef<HTMLDivElement | null>(null);
+  const [boardOuterWidth, setBoardOuterWidth] = useState(0);
+
+  const [drawerOpen, setDrawerOpen] = useState(false);
+  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [detailErrorMessage, setDetailErrorMessage] = useState<string | null>(
+    null
   );
-  const columnsId = useMemo(() => columns.map((col) => col.id), [columns]);
+  const [detail, setDetail] = useState<TaskDetail | null>(null);
 
-  // const [tasks, setTasks] = useState<Task[]>(initialTasks);
-  const tasks = useTaskStore((state) => state.tasks);
-  const setTasks = useTaskStore((state) => state.setTasks);
-  const [activeColumn, setActiveColumn] = useState<Column | null>(null);
-  const [isMounted, setIsMounted] = useState<Boolean>(false);
+  const tasksByStatus = useMemo(() => {
+    const map = new Map<AgentTaskStatus, TaskRow[]>();
+    for (const col of statusColumns) map.set(col.id, []);
+    for (const t of tasks) {
+      map.get(t.status)?.push(t);
+    }
+    return map;
+  }, [tasks]);
 
-  const [activeTask, setActiveTask] = useState<Task | null>(null);
-
-  const sensors = useSensors(
-    useSensor(MouseSensor),
-    useSensor(TouchSensor)
-    // useSensor(KeyboardSensor, {
-    //   coordinateGetter: coordinateGetter,
-    // }),
-  );
-
-  useEffect(() => {
-    setIsMounted(true);
-  }, [isMounted]);
-
-  useEffect(() => {
-    useTaskStore.persist.rehydrate();
-  }, []);
-  if (!isMounted) return;
-
-  function getDraggingTaskData(taskId: UniqueIdentifier, columnId: ColumnId) {
-    const tasksInColumn = tasks.filter((task) => task.status === columnId);
-    const taskPosition = tasksInColumn.findIndex((task) => task.id === taskId);
-    const column = columns.find((col) => col.id === columnId);
-    return {
-      tasksInColumn,
-      taskPosition,
-      column
-    };
-  }
-
-  const announcements: Announcements = {
-    onDragStart({ active }) {
-      if (!hasDraggableData(active)) return;
-      if (active.data.current?.type === 'Column') {
-        const startColumnIdx = columnsId.findIndex((id) => id === active.id);
-        const startColumn = columns[startColumnIdx];
-        return `Picked up Column ${startColumn?.title} at position: ${
-          startColumnIdx + 1
-        } of ${columnsId.length}`;
-      } else if (active.data.current?.type === 'Task') {
-        pickedUpTaskColumn.current = active.data.current.task.status;
-        const { tasksInColumn, taskPosition, column } = getDraggingTaskData(
-          active.id,
-          pickedUpTaskColumn.current
-        );
-        return `Picked up Task ${active.data.current.task.title} at position: ${
-          taskPosition + 1
-        } of ${tasksInColumn.length} in column ${column?.title}`;
-      }
-    },
-    onDragOver({ active, over }) {
-      if (!hasDraggableData(active) || !hasDraggableData(over)) return;
-
-      if (
-        active.data.current?.type === 'Column' &&
-        over.data.current?.type === 'Column'
-      ) {
-        const overColumnIdx = columnsId.findIndex((id) => id === over.id);
-        return `Column ${active.data.current.column.title} was moved over ${
-          over.data.current.column.title
-        } at position ${overColumnIdx + 1} of ${columnsId.length}`;
-      } else if (
-        active.data.current?.type === 'Task' &&
-        over.data.current?.type === 'Task'
-      ) {
-        const { tasksInColumn, taskPosition, column } = getDraggingTaskData(
-          over.id,
-          over.data.current.task.status
-        );
-        if (over.data.current.task.status !== pickedUpTaskColumn.current) {
-          return `Task ${
-            active.data.current.task.title
-          } was moved over column ${column?.title} in position ${
-            taskPosition + 1
-          } of ${tasksInColumn.length}`;
-        }
-        return `Task was moved over position ${taskPosition + 1} of ${
-          tasksInColumn.length
-        } in column ${column?.title}`;
-      }
-    },
-    onDragEnd({ active, over }) {
-      if (!hasDraggableData(active) || !hasDraggableData(over)) {
-        pickedUpTaskColumn.current = 'TODO';
+  const refresh = useCallback(async () => {
+    setLoading(true);
+    setErrorMessage(null);
+    try {
+      const res = await fetchWithTenantRefresh('/api/agent-tasks?limit=200');
+      const data = (await res.json().catch(() => null)) as any;
+      if (!res.ok) {
+        setErrorMessage(data?.error?.message || '加载失败');
+        setTasks([]);
         return;
       }
-      if (
-        active.data.current?.type === 'Column' &&
-        over.data.current?.type === 'Column'
-      ) {
-        const overColumnPosition = columnsId.findIndex((id) => id === over.id);
-
-        return `Column ${
-          active.data.current.column.title
-        } was dropped into position ${overColumnPosition + 1} of ${
-          columnsId.length
-        }`;
-      } else if (
-        active.data.current?.type === 'Task' &&
-        over.data.current?.type === 'Task'
-      ) {
-        const { tasksInColumn, taskPosition, column } = getDraggingTaskData(
-          over.id,
-          over.data.current.task.status
-        );
-        if (over.data.current.task.status !== pickedUpTaskColumn.current) {
-          return `Task was dropped into column ${column?.title} in position ${
-            taskPosition + 1
-          } of ${tasksInColumn.length}`;
-        }
-        return `Task was dropped into position ${taskPosition + 1} of ${
-          tasksInColumn.length
-        } in column ${column?.title}`;
-      }
-      pickedUpTaskColumn.current = 'TODO';
-    },
-    onDragCancel({ active }) {
-      pickedUpTaskColumn.current = 'TODO';
-      if (!hasDraggableData(active)) return;
-      return `Dragging ${active.data.current?.type} cancelled.`;
+      const list = Array.isArray(data?.tasks) ? data.tasks : [];
+      setTasks(
+        list
+          .filter((t: any) => t && typeof t.id === 'string')
+          .map((t: any) => ({
+            id: String(t.id),
+            tenantId: String(t.tenantId),
+            sessionId: String(t.sessionId),
+            sessionTitle:
+              typeof t.sessionTitle === 'string' ? t.sessionTitle : null,
+            parentTaskId:
+              typeof t.parentTaskId === 'string' ? t.parentTaskId : null,
+            orderNo: Number.isFinite(t.orderNo) ? t.orderNo : 0,
+            title: typeof t.title === 'string' ? t.title : '',
+            goal: typeof t.goal === 'string' ? t.goal : null,
+            acceptanceCriteria:
+              typeof t.acceptanceCriteria === 'string'
+                ? t.acceptanceCriteria
+                : null,
+            status: t.status as AgentTaskStatus,
+            lifecycle: t.lifecycle as AgentTaskLifecycle,
+            assignedClientId:
+              typeof t.assignedClientId === 'string' ? t.assignedClientId : null,
+            idempotencyKey:
+              typeof t.idempotencyKey === 'string' ? t.idempotencyKey : null,
+            input: t.input ?? {},
+            output: t.output ?? {},
+            createdAt: typeof t.createdAt === 'string' ? t.createdAt : '',
+            updatedAt: typeof t.updatedAt === 'string' ? t.updatedAt : '',
+            extra: t.extra ?? {}
+          }))
+      );
+    } catch {
+      setErrorMessage('加载失败');
+      setTasks([]);
+    } finally {
+      setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    void refresh();
+  }, [refresh]);
+
+  useEffect(() => {
+    if (!drawerOpen || !selectedTaskId) return;
+    let cancelled = false;
+
+    (async () => {
+      setDetailLoading(true);
+      setDetailErrorMessage(null);
+      setDetail(null);
+      try {
+        const res = await fetchWithTenantRefresh(
+          `/api/agent-tasks/${selectedTaskId}`
+        );
+        const data = (await res.json().catch(() => null)) as any;
+        if (!res.ok) {
+          if (cancelled) return;
+          setDetailErrorMessage(data?.error?.message || '加载失败');
+          return;
+        }
+        if (cancelled) return;
+        setDetail(data as TaskDetail);
+      } catch {
+        if (cancelled) return;
+        setDetailErrorMessage('加载失败');
+      } finally {
+        if (cancelled) return;
+        setDetailLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [drawerOpen, selectedTaskId]);
+
+  const totalCount = tasks.length;
+  const boardContentWidth = useMemo(() => {
+    const cols = statusColumns.length;
+    if (cols <= 0) return 0;
+    return cols * COLUMN_WIDTH + (cols - 1) * COLUMN_GAP + BOARD_PADDING_X;
+  }, []);
+
+  const boardMaxWidth = useMemo(() => {
+    if (!boardOuterWidth) return undefined;
+    return Math.min(boardOuterWidth, boardContentWidth);
+  }, [boardOuterWidth, boardContentWidth]);
+
+  useEffect(() => {
+    const el = boardOuterRef.current;
+    if (!el) return;
+
+    const observer = new ResizeObserver(() => {
+      setBoardOuterWidth(el.clientWidth);
+    });
+    observer.observe(el);
+    setBoardOuterWidth(el.clientWidth);
+    return () => observer.disconnect();
+  }, []);
 
   return (
-    <DndContext
-      accessibility={{
-        announcements
-      }}
-      sensors={sensors}
-      onDragStart={onDragStart}
-      onDragEnd={onDragEnd}
-      onDragOver={onDragOver}
-    >
-      <BoardContainer>
-        <SortableContext items={columnsId}>
-          {columns?.map((col, index) => (
-            <Fragment key={col.id}>
-              <BoardColumn
-                column={col}
-                tasks={tasks.filter((task) => task.status === col.id)}
-              />
-              {index === columns?.length - 1 && (
-                <div className='w-[300px]'>
-                  <NewSectionDialog />
-                </div>
-              )}
-            </Fragment>
-          ))}
-          {!columns.length && <NewSectionDialog />}
-        </SortableContext>
-      </BoardContainer>
+    <div className='space-y-4'>
+      <div className='flex items-center justify-between gap-3'>
+        <div className='text-muted-foreground text-sm'>
+          {loading ? '加载中…' : `共 ${totalCount} 个任务`}
+        </div>
+        <Button variant='outline' onClick={() => void refresh()} disabled={loading}>
+          刷新
+        </Button>
+      </div>
 
-      {'document' in window &&
-        createPortal(
-          <DragOverlay>
-            {activeColumn && (
-              <BoardColumn
-                isOverlay
-                column={activeColumn}
-                tasks={tasks.filter((task) => task.status === activeColumn.id)}
-              />
+      {errorMessage ? (
+        <div className='rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive'>
+          {errorMessage}
+        </div>
+      ) : null}
+
+      <div ref={boardOuterRef} className='w-full min-w-0'>
+        <div className='w-full overflow-x-auto' style={boardMaxWidth ? { maxWidth: boardMaxWidth } : undefined}>
+          <div
+            className='flex flex-row items-start justify-start gap-4 px-2 pb-4 md:px-0'
+            style={{ minWidth: boardContentWidth }}
+          >
+            {statusColumns.map((col) => {
+              const items = tasksByStatus.get(col.id) ?? [];
+              return (
+                <Card
+                  key={col.id}
+                  className='h-[75vh] max-h-[75vh] w-[350px] max-w-full shrink-0 bg-secondary'
+                >
+                  <CardHeader className='flex flex-row items-center justify-between border-b-2 p-4'>
+                    <div className='font-semibold'>{col.title}</div>
+                    <Badge variant='outline' className='font-semibold'>
+                      {items.length}
+                    </Badge>
+                  </CardHeader>
+                  <CardContent className='flex h-[calc(75vh-72px)] flex-col gap-2 overflow-hidden p-2'>
+                    <ScrollArea className='h-full'>
+                      {items.length === 0 ? (
+                        <div className='text-muted-foreground px-2 py-4 text-sm'>
+                          暂无任务
+                        </div>
+                      ) : (
+                        <div className='space-y-2 px-1'>
+                          {items.map((t) => (
+                            <Card
+                              key={t.id}
+                              className='w-full max-w-full cursor-pointer overflow-hidden'
+                              onClick={() => {
+                                setSelectedTaskId(t.id);
+                                setDrawerOpen(true);
+                              }}
+                            >
+                              <CardHeader className='flex min-w-0 flex-row items-center justify-between gap-2 border-b px-3 py-3'>
+                                <div className='flex items-center gap-2'>
+                                  <Badge
+                                    variant={statusBadgeVariant(t.status)}
+                                  >
+                                    {statusLabel(t.status)}
+                                  </Badge>
+                                  <Badge variant='outline'>
+                                    {lifecycleLabel(t.lifecycle)}
+                                  </Badge>
+                                </div>
+                                <div className='text-muted-foreground min-w-0 max-w-[160px] truncate text-xs'>
+                                  {t.sessionTitle?.trim()
+                                    ? t.sessionTitle
+                                    : `会话 ${t.sessionId}`}
+                                </div>
+                              </CardHeader>
+                              <CardContent className='px-3 pb-4 pt-3 text-left'>
+                                <div className='line-clamp-3 whitespace-pre-wrap text-sm font-medium'>
+                                  {t.title || '未命名任务'}
+                                </div>
+                                <div className='text-muted-foreground mt-2 text-xs'>
+                                  更新时间：{formatDateTime(t.updatedAt)}
+                                </div>
+                              </CardContent>
+                            </Card>
+                          ))}
+                        </div>
+                      )}
+                    </ScrollArea>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+
+      <Drawer
+        direction='right'
+        open={drawerOpen}
+        onOpenChange={(open) => {
+          setDrawerOpen(open);
+          if (!open) {
+            setSelectedTaskId(null);
+            setDetail(null);
+            setDetailErrorMessage(null);
+            setDetailLoading(false);
+          }
+        }}
+      >
+        <DrawerContent className='sm:max-w-xl'>
+          <DrawerHeader className='gap-2'>
+            <div className='flex items-center justify-between gap-3'>
+              <DrawerTitle>任务详情</DrawerTitle>
+              <DrawerClose asChild>
+                <Button variant='outline'>关闭</Button>
+              </DrawerClose>
+            </div>
+            <div className='text-muted-foreground text-xs'>
+              {selectedTaskId ? `任务ID：${selectedTaskId}` : ''}
+            </div>
+          </DrawerHeader>
+
+          <div className='space-y-4 overflow-auto px-4 pb-4'>
+            {detailLoading ? (
+              <div className='text-muted-foreground text-sm'>加载中…</div>
+            ) : detailErrorMessage ? (
+              <div className='rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive'>
+                {detailErrorMessage}
+              </div>
+            ) : detail ? (
+              <div className='space-y-4'>
+                <Card>
+                  <CardHeader className='border-b px-4 py-3 font-semibold'>
+                    基本信息
+                  </CardHeader>
+                  <CardContent className='space-y-2 px-4 py-3 text-sm'>
+                    <div className='flex flex-wrap items-center gap-2'>
+                      <Badge variant={statusBadgeVariant(detail.task.status)}>
+                        {statusLabel(detail.task.status)}
+                      </Badge>
+                      <Badge variant='outline'>
+                        {lifecycleLabel(detail.task.lifecycle)}
+                      </Badge>
+                    </div>
+                    <div className='font-medium'>
+                      {detail.task.title || '未命名任务'}
+                    </div>
+                    <div className='text-muted-foreground'>
+                      会话：
+                      {detail.task.sessionTitle?.trim()
+                        ? detail.task.sessionTitle
+                        : detail.task.sessionId}
+                    </div>
+                    <div className='text-muted-foreground'>
+                      创建时间：{formatDateTime(detail.task.createdAt)}
+                    </div>
+                    <div className='text-muted-foreground'>
+                      更新时间：{formatDateTime(detail.task.updatedAt)}
+                    </div>
+                    <div className='text-muted-foreground'>
+                      分派客户端：
+                      {detail.task.assignedClientId || '-'}
+                    </div>
+                    <div className='text-muted-foreground'>
+                      父任务：{detail.task.parentTaskId || '-'}
+                    </div>
+                    <div className='text-muted-foreground'>
+                      顺序号：{detail.task.orderNo}
+                    </div>
+                    <div className='text-muted-foreground'>
+                      幂等键：{detail.task.idempotencyKey || '-'}
+                    </div>
+                    {detail.task.goal ? (
+                      <div>
+                        <div className='font-medium'>目标</div>
+                        <div className='text-muted-foreground whitespace-pre-wrap'>
+                          {detail.task.goal}
+                        </div>
+                      </div>
+                    ) : null}
+                    {detail.task.acceptanceCriteria ? (
+                      <div>
+                        <div className='font-medium'>验收标准</div>
+                        <div className='text-muted-foreground whitespace-pre-wrap'>
+                          {detail.task.acceptanceCriteria}
+                        </div>
+                      </div>
+                    ) : null}
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader className='border-b px-4 py-3 font-semibold'>
+                    输入 / 输出
+                  </CardHeader>
+                  <CardContent className='space-y-3 px-4 py-3'>
+                    <div>
+                      <div className='mb-2 text-sm font-medium'>输入</div>
+                      <pre className='bg-muted overflow-auto rounded-md p-3 text-xs'>
+                        {safeJson(detail.task.input)}
+                      </pre>
+                    </div>
+                    <div>
+                      <div className='mb-2 text-sm font-medium'>输出</div>
+                      <pre className='bg-muted overflow-auto rounded-md p-3 text-xs'>
+                        {safeJson(detail.task.output)}
+                      </pre>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader className='border-b px-4 py-3 font-semibold'>
+                    执行记录
+                  </CardHeader>
+                  <CardContent className='space-y-2 px-4 py-3'>
+                    {detail.runs.length === 0 ? (
+                      <div className='text-muted-foreground text-sm'>
+                        暂无执行记录
+                      </div>
+                    ) : (
+                      <div className='space-y-2'>
+                        {detail.runs.map((r) => (
+                          <div
+                            key={r.id}
+                            className='rounded-md border px-3 py-2 text-sm'
+                          >
+                            <div className='flex flex-wrap items-center justify-between gap-2'>
+                              <div className='font-medium'>Run #{r.runNo}</div>
+                              <Badge variant={statusBadgeVariant(r.status)}>
+                                {statusLabel(r.status)}
+                              </Badge>
+                            </div>
+                            <div className='text-muted-foreground mt-1 text-xs'>
+                              客户端：{r.clientId}
+                            </div>
+                            <div className='text-muted-foreground mt-1 text-xs'>
+                              开始：{formatDateTime(r.startedAt)}
+                            </div>
+                            <div className='text-muted-foreground mt-1 text-xs'>
+                              结束：{formatDateTime(r.finishedAt)}
+                            </div>
+                            {r.error ? (
+                              <div className='text-destructive mt-2 whitespace-pre-wrap text-xs'>
+                                {r.error}
+                              </div>
+                            ) : null}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader className='border-b px-4 py-3 font-semibold'>
+                    事件时间线
+                  </CardHeader>
+                  <CardContent className='space-y-2 px-4 py-3'>
+                    {detail.events.length === 0 ? (
+                      <div className='text-muted-foreground text-sm'>
+                        暂无事件
+                      </div>
+                    ) : (
+                      <div className='space-y-2'>
+                        {detail.events.map((e) => (
+                          <div
+                            key={e.id}
+                            className='rounded-md border px-3 py-2 text-sm'
+                          >
+                            <div className='flex flex-wrap items-center justify-between gap-2'>
+                              <div className='font-medium'>{e.type}</div>
+                              <div className='text-muted-foreground text-xs'>
+                                {formatDateTime(e.occurredAt)}
+                              </div>
+                            </div>
+                            <pre className='bg-muted mt-2 overflow-auto rounded-md p-3 text-xs'>
+                              {safeJson(e.payload)}
+                            </pre>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </div>
+            ) : (
+              <div className='text-muted-foreground text-sm'>
+                请选择一个任务查看详情
+              </div>
             )}
-            {activeTask && <TaskCard task={activeTask} isOverlay />}
-          </DragOverlay>,
-          document.body
-        )}
-    </DndContext>
+          </div>
+
+          <DrawerFooter>
+            <DrawerClose asChild>
+              <Button variant='outline'>关闭</Button>
+            </DrawerClose>
+          </DrawerFooter>
+        </DrawerContent>
+      </Drawer>
+    </div>
   );
+}
 
-  function onDragStart(event: DragStartEvent) {
-    if (!hasDraggableData(event.active)) return;
-    const data = event.active.data.current;
-    if (data?.type === 'Column') {
-      setActiveColumn(data.column);
-      return;
-    }
+function formatDateTime(value: string | null) {
+  if (!value) return '-';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '-';
+  return date.toLocaleString();
+}
 
-    if (data?.type === 'Task') {
-      setActiveTask(data.task);
-      return;
-    }
-  }
+function statusLabel(status: AgentTaskStatus) {
+  if (status === 'pending') return '待执行';
+  if (status === 'running') return '执行中';
+  if (status === 'succeeded') return '成功';
+  return '失败';
+}
 
-  function onDragEnd(event: DragEndEvent) {
-    setActiveColumn(null);
-    setActiveTask(null);
+function lifecycleLabel(lifecycle: AgentTaskLifecycle) {
+  if (lifecycle === 'open') return '开放';
+  if (lifecycle === 'blocked') return '阻塞';
+  if (lifecycle === 'canceled') return '已取消';
+  return '已关闭';
+}
 
-    const { active, over } = event;
-    if (!over) return;
+function statusBadgeVariant(
+  status: AgentTaskStatus
+): 'default' | 'secondary' | 'destructive' | 'outline' {
+  if (status === 'running') return 'default';
+  if (status === 'succeeded') return 'secondary';
+  if (status === 'failed') return 'destructive';
+  return 'outline';
+}
 
-    const activeId = active.id;
-    const overId = over.id;
-
-    if (!hasDraggableData(active)) return;
-
-    const activeData = active.data.current;
-
-    if (activeId === overId) return;
-
-    const isActiveAColumn = activeData?.type === 'Column';
-    if (!isActiveAColumn) return;
-
-    const activeColumnIndex = columns.findIndex((col) => col.id === activeId);
-
-    const overColumnIndex = columns.findIndex((col) => col.id === overId);
-
-    setColumns(arrayMove(columns, activeColumnIndex, overColumnIndex));
-  }
-
-  function onDragOver(event: DragOverEvent) {
-    const { active, over } = event;
-    if (!over) return;
-
-    const activeId = active.id;
-    const overId = over.id;
-
-    if (activeId === overId) return;
-
-    if (!hasDraggableData(active) || !hasDraggableData(over)) return;
-
-    const activeData = active.data.current;
-    const overData = over.data.current;
-
-    const isActiveATask = activeData?.type === 'Task';
-    const isOverATask = activeData?.type === 'Task';
-
-    if (!isActiveATask) return;
-
-    // Im dropping a Task over another Task
-    if (isActiveATask && isOverATask) {
-      const activeIndex = tasks.findIndex((t) => t.id === activeId);
-      const overIndex = tasks.findIndex((t) => t.id === overId);
-      const activeTask = tasks[activeIndex];
-      const overTask = tasks[overIndex];
-      if (activeTask && overTask && activeTask.status !== overTask.status) {
-        activeTask.status = overTask.status;
-        setTasks(arrayMove(tasks, activeIndex, overIndex - 1));
-      }
-
-      setTasks(arrayMove(tasks, activeIndex, overIndex));
-    }
-
-    const isOverAColumn = overData?.type === 'Column';
-
-    // Im dropping a Task over a column
-    if (isActiveATask && isOverAColumn) {
-      const activeIndex = tasks.findIndex((t) => t.id === activeId);
-      const activeTask = tasks[activeIndex];
-      if (activeTask) {
-        activeTask.status = overId as ColumnId;
-        setTasks(arrayMove(tasks, activeIndex, activeIndex));
-      }
-    }
+function safeJson(value: unknown) {
+  try {
+    return JSON.stringify(value ?? {}, null, 2);
+  } catch {
+    return '{}';
   }
 }
