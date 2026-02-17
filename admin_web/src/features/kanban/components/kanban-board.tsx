@@ -1,10 +1,10 @@
 'use client';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { fetchWithTenantRefresh } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { ScrollArea } from '@/components/ui/scroll-area';
+import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import {
   Drawer,
   DrawerClose,
@@ -78,17 +78,10 @@ const statusColumns: Array<{ id: AgentTaskStatus; title: string }> = [
   { id: 'failed', title: '失败' }
 ];
 
-const COLUMN_WIDTH = 350;
-const COLUMN_GAP = 16;
-const BOARD_PADDING_X = 16;
-
 export function KanbanBoard() {
   const [tasks, setTasks] = useState<TaskRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
-
-  const boardOuterRef = useRef<HTMLDivElement | null>(null);
-  const [boardOuterWidth, setBoardOuterWidth] = useState(0);
 
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null);
@@ -197,28 +190,6 @@ export function KanbanBoard() {
   }, [drawerOpen, selectedTaskId]);
 
   const totalCount = tasks.length;
-  const boardContentWidth = useMemo(() => {
-    const cols = statusColumns.length;
-    if (cols <= 0) return 0;
-    return cols * COLUMN_WIDTH + (cols - 1) * COLUMN_GAP + BOARD_PADDING_X;
-  }, []);
-
-  const boardMaxWidth = useMemo(() => {
-    if (!boardOuterWidth) return undefined;
-    return Math.min(boardOuterWidth, boardContentWidth);
-  }, [boardOuterWidth, boardContentWidth]);
-
-  useEffect(() => {
-    const el = boardOuterRef.current;
-    if (!el) return;
-
-    const observer = new ResizeObserver(() => {
-      setBoardOuterWidth(el.clientWidth);
-    });
-    observer.observe(el);
-    setBoardOuterWidth(el.clientWidth);
-    return () => observer.disconnect();
-  }, []);
 
   return (
     <div className='space-y-4'>
@@ -237,79 +208,73 @@ export function KanbanBoard() {
         </div>
       ) : null}
 
-      <div ref={boardOuterRef} className='w-full min-w-0'>
-        <div className='w-full overflow-x-auto' style={boardMaxWidth ? { maxWidth: boardMaxWidth } : undefined}>
-          <div
-            className='flex flex-row items-start justify-start gap-4 px-2 pb-4 md:px-0'
-            style={{ minWidth: boardContentWidth }}
-          >
-            {statusColumns.map((col) => {
-              const items = tasksByStatus.get(col.id) ?? [];
-              return (
-                <Card
-                  key={col.id}
-                  className='h-[75vh] max-h-[75vh] w-[350px] max-w-full shrink-0 bg-secondary'
-                >
-                  <CardHeader className='flex flex-row items-center justify-between border-b-2 p-4'>
-                    <div className='font-semibold'>{col.title}</div>
-                    <Badge variant='outline' className='font-semibold'>
-                      {items.length}
-                    </Badge>
-                  </CardHeader>
-                  <CardContent className='flex h-[calc(75vh-72px)] flex-col gap-2 overflow-hidden p-2'>
-                    <ScrollArea className='h-full'>
-                      {items.length === 0 ? (
-                        <div className='text-muted-foreground px-2 py-4 text-sm'>
-                          暂无任务
-                        </div>
-                      ) : (
-                        <div className='space-y-2 px-1'>
-                          {items.map((t) => (
-                            <Card
-                              key={t.id}
-                              className='w-full max-w-full cursor-pointer overflow-hidden'
-                              onClick={() => {
-                                setSelectedTaskId(t.id);
-                                setDrawerOpen(true);
-                              }}
-                            >
-                              <CardHeader className='flex min-w-0 flex-row items-center justify-between gap-2 border-b px-3 py-3'>
-                                <div className='flex items-center gap-2'>
-                                  <Badge
-                                    variant={statusBadgeVariant(t.status)}
-                                  >
-                                    {statusLabel(t.status)}
-                                  </Badge>
-                                  <Badge variant='outline'>
-                                    {lifecycleLabel(t.lifecycle)}
-                                  </Badge>
-                                </div>
-                                <div className='text-muted-foreground min-w-0 max-w-[160px] truncate text-xs'>
-                                  {t.sessionTitle?.trim()
-                                    ? t.sessionTitle
-                                    : `会话 ${t.sessionId}`}
-                                </div>
-                              </CardHeader>
-                              <CardContent className='px-3 pb-4 pt-3 text-left'>
-                                <div className='line-clamp-3 whitespace-pre-wrap text-sm font-medium'>
-                                  {t.title || '未命名任务'}
-                                </div>
-                                <div className='text-muted-foreground mt-2 text-xs'>
-                                  更新时间：{formatDateTime(t.updatedAt)}
-                                </div>
-                              </CardContent>
-                            </Card>
-                          ))}
-                        </div>
-                      )}
-                    </ScrollArea>
-                  </CardContent>
-                </Card>
-              );
-            })}
-          </div>
+      <ScrollArea className='w-full rounded-md whitespace-nowrap'>
+        <div className='flex flex-row items-start justify-start gap-4 px-2 pb-4 md:px-0'>
+          {statusColumns.map((col) => {
+            const items = tasksByStatus.get(col.id) ?? [];
+            return (
+              <Card
+                key={col.id}
+                className='h-[75vh] max-h-[75vh] w-[calc(25%-12px)] min-w-[300px] max-w-full shrink-0 bg-secondary'
+              >
+                <CardHeader className='flex flex-row items-center justify-between border-b-2 p-4'>
+                  <div className='font-semibold'>{col.title}</div>
+                  <Badge variant='outline' className='font-semibold'>
+                    {items.length}
+                  </Badge>
+                </CardHeader>
+                <CardContent className='flex h-[calc(75vh-72px)] flex-col gap-2 overflow-hidden p-2'>
+                  <ScrollArea className='h-full'>
+                    {items.length === 0 ? (
+                      <div className='text-muted-foreground px-2 py-4 text-sm'>
+                        暂无任务
+                      </div>
+                    ) : (
+                      <div className='space-y-2 px-1'>
+                        {items.map((t) => (
+                          <Card
+                            key={t.id}
+                            className='cursor-pointer'
+                            onClick={() => {
+                              setSelectedTaskId(t.id);
+                              setDrawerOpen(true);
+                            }}
+                          >
+                            <CardHeader className='flex flex-row items-center justify-between gap-2 border-b px-3 py-3'>
+                              <div className='flex items-center gap-2'>
+                                <Badge variant={statusBadgeVariant(t.status)}>
+                                  {statusLabel(t.status)}
+                                </Badge>
+                                <Badge variant='outline'>
+                                  {lifecycleLabel(t.lifecycle)}
+                                </Badge>
+                              </div>
+                              <div className='text-muted-foreground truncate text-xs'>
+                                {t.sessionTitle?.trim()
+                                  ? t.sessionTitle
+                                  : `会话 ${t.sessionId}`}
+                              </div>
+                            </CardHeader>
+                            <CardContent className='px-3 pb-4 pt-3 text-left'>
+                              <div className='line-clamp-3 whitespace-pre-wrap text-sm font-medium'>
+                                {t.title || '未命名任务'}
+                              </div>
+                              <div className='text-muted-foreground mt-2 text-xs'>
+                                更新时间：{formatDateTime(t.updatedAt)}
+                              </div>
+                            </CardContent>
+                          </Card>
+                        ))}
+                      </div>
+                    )}
+                  </ScrollArea>
+                </CardContent>
+              </Card>
+            );
+          })}
         </div>
-      </div>
+        <ScrollBar orientation='horizontal' />
+      </ScrollArea>
 
       <Drawer
         direction='right'
