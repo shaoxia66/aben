@@ -56,6 +56,11 @@ export const navItems: NavItem[] = [
         title: '会话管理',
         url: '/dashboard/workspaces/sessions',
         icon: 'post'
+      },
+      {
+        title: 'Skills 管理',
+        url: '/dashboard/workspaces/skills',
+        icon: 'settings'
       }
     ]
   },

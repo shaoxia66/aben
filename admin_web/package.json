@@ -112,7 +112,8 @@
     "uuid": "^11.0.3",
     "vaul": "^1.1.2",
     "zod": "^4.1.8",
-    "zustand": "^5.0.2"
+    "zustand": "^5.0.2",
+    "jszip": "^3.10.1"
   },
   "devDependencies": {
     "@faker-js/faker": "^9.3.0",
@@ -123,6 +124,7 @@
     "@types/uuid": "^10.0.0",
     "husky": "^9.1.7",
     "lint-staged": "^15.2.11",
+    "mqtt": "^5.14.1",
     "prettier": "3.4.2",
     "prettier-plugin-tailwindcss": "^0.6.11",
     "tw-animate-css": "^1.2.4"
