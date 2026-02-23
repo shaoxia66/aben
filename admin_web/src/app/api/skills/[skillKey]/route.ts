@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import { requireTenantAuth } from "@/server/auth/infra/require-tenant-auth";
 import { getSkillDetail } from "@/server/skills/application/queries/get-skill-detail";
 import { updateSkillFile } from "@/server/skills/application/commands/update-skill-file";
-import { setSkillEnabled } from "@/server/skills/application/commands/update-skill-enabled";
 
 export const runtime = "nodejs";
 
@@ -28,7 +27,7 @@ export async function GET(
     );
   }
 
-  const detail = await getSkillDetail(skillKey);
+  const detail = await getSkillDetail(auth.context.tenantId, skillKey);
 
   if (!detail) {
     return NextResponse.json(
@@ -77,35 +76,17 @@ export async function PATCH(
     body as object,
     "content"
   );
-  const hasEnabled = Object.prototype.hasOwnProperty.call(
-    body as object,
-    "enabled"
-  );
 
-  if (!hasPath && !hasContent && !hasEnabled) {
+  if (!hasPath && !hasContent) {
     return NextResponse.json(
       {
         error: {
           code: "INVALID_INPUT",
-          message: "请求体中至少需要包含 path/content 或 enabled 字段"
+          message: "请求体中至少需要包含 path 或 content 字段"
         }
       },
       { status: 400 }
     );
-  }
-
-  if (hasEnabled) {
-    const enabledValue = (body as { enabled: unknown }).enabled;
-    const enabled =
-      typeof enabledValue === "boolean"
-        ? enabledValue
-        : enabledValue === 1 ||
-          enabledValue === "1" ||
-          enabledValue === "true";
-    await setSkillEnabled({
-      skillKey,
-      enabled
-    });
   }
 
   if (hasPath || hasContent) {
@@ -130,6 +111,7 @@ export async function PATCH(
     }
     if (path) {
       await updateSkillFile({
+        tenantId: auth.context.tenantId,
         skillKey,
         path,
         content
@@ -137,7 +119,7 @@ export async function PATCH(
     }
   }
 
-  const detail = await getSkillDetail(skillKey);
+  const detail = await getSkillDetail(auth.context.tenantId, skillKey);
 
   return NextResponse.json({ ok: true, skill: detail });
 }

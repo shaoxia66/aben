@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireTenantAuth } from "@/server/auth/infra/require-tenant-auth";
-import { listSkills } from "@/server/skills/application/queries/list-skills";
+import { listClientSkills } from "@/server/clients/application/queries/list-client-skills";
 
 export const runtime = "nodejs";
 
@@ -13,9 +13,10 @@ export async function GET(request: Request) {
     );
   }
 
-  const skills = await listSkills(auth.context.tenantId);
+  const bindings = await listClientSkills({ tenantId: auth.context.tenantId });
 
   return NextResponse.json({
-    skills
+    bindings
   });
 }
+

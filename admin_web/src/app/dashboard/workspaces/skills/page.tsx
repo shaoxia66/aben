@@ -23,14 +23,12 @@ import {
   DialogHeader,
   DialogTitle
 } from '@/components/ui/dialog';
-import { Switch } from '@/components/ui/switch';
 
 type SkillSummary = {
   skillKey: string;
   name: string;
   description: string | null;
   fileCount: number;
-  enabled: boolean;
   createdAt: string;
   updatedAt: string;
 };
@@ -348,8 +346,7 @@ export default function WorkspaceSkillsPage() {
                   <TableRow>
                     <TableHead>名称</TableHead>
                     <TableHead>标识</TableHead>
-                        <TableHead>文件数</TableHead>
-                        <TableHead>状态</TableHead>
+                    <TableHead>文件数</TableHead>
                     <TableHead>创建时间</TableHead>
                     <TableHead>更新时间</TableHead>
                     <TableHead className='text-right'>操作</TableHead>
@@ -376,55 +373,6 @@ export default function WorkspaceSkillsPage() {
                           {skill.skillKey}
                         </TableCell>
                         <TableCell>{skill.fileCount}</TableCell>
-                        <TableCell>
-                          <div className='flex items-center gap-2'>
-                            <Switch
-                              checked={skill.enabled}
-                              onCheckedChange={async (checked) => {
-                                const nextEnabled = !!checked;
-                                const prev = skills;
-                                setSkills((current) =>
-                                  current.map((item) =>
-                                    item.skillKey === skill.skillKey
-                                      ? { ...item, enabled: nextEnabled }
-                                      : item
-                                  )
-                                );
-                                try {
-                                  const response = await fetchWithTenantRefresh(
-                                    `/api/skills/${encodeURIComponent(skill.skillKey)}`,
-                                    {
-                                      method: 'PATCH',
-                                      headers: {
-                                        'Content-Type': 'application/json'
-                                      },
-                                      body: JSON.stringify({
-                                        enabled: nextEnabled
-                                      })
-                                    }
-                                  );
-                                  const data = await response.json().catch(() => null);
-                                  if (!response.ok) {
-                                    const message =
-                                      typeof data?.error?.message === 'string'
-                                        ? data.error.message
-                                        : '更新启用状态失败';
-                                    toast.error(message);
-                                    setSkills(prev);
-                                    return;
-                                  }
-                                  toast.success(nextEnabled ? '已启用' : '已禁用');
-                                } catch {
-                                  toast.error('更新启用状态失败，请稍后重试');
-                                  setSkills(prev);
-                                }
-                              }}
-                            />
-                            <span className='text-muted-foreground text-xs'>
-                              {skill.enabled ? '启用' : '禁用'}
-                            </span>
-                          </div>
-                        </TableCell>
                         <TableCell className='text-muted-foreground text-xs'>
                           {new Date(skill.createdAt).toLocaleString()}
                         </TableCell>

@@ -18,6 +18,7 @@ export type SkillDetail = {
 };
 
 export async function getSkillDetail(
+  tenantId: string,
   skillKey: string
 ): Promise<SkillDetail | null> {
   return await withTransaction(async (client) => {
@@ -34,10 +35,10 @@ export async function getSkillDetail(
       [
         "SELECT skill_key, path, name, description, content, content_type, created_at, updated_at",
         "FROM skills",
-        "WHERE skill_key = $1",
+        "WHERE tenant_id = $1 AND skill_key = $2",
         "ORDER BY (path = '') DESC, path ASC"
       ].join(" "),
-      [skillKey]
+      [tenantId, skillKey]
     );
 
     if (result.rows.length === 0) {
@@ -74,4 +75,3 @@ export async function getSkillDetail(
     };
   });
 }
-

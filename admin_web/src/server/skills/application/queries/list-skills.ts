@@ -5,19 +5,17 @@ export type SkillSummary = {
   name: string;
   description: string | null;
   fileCount: number;
-  enabled: boolean;
   createdAt: string;
   updatedAt: string;
 };
 
-export async function listSkills(): Promise<SkillSummary[]> {
+export async function listSkills(tenantId: string): Promise<SkillSummary[]> {
   return await withTransaction(async (client) => {
     const result = await client.query<{
       skill_key: string;
       name: string | null;
       description: string | null;
       file_count: number;
-      enabled: boolean | null;
       created_at: Date;
       updated_at: Date;
     }>(
@@ -31,17 +29,14 @@ export async function listSkills(): Promise<SkillSummary[]> {
         "  ) AS name,",
         "  MAX(CASE WHEN s.path = '' THEN s.description END) AS description,",
         "  COUNT(*) AS file_count,",
-        "  COALESCE(",
-        "    MAX(CASE WHEN s.path = '' THEN s.enabled::int END),",
-        "    MAX(s.enabled::int),",
-        "    1",
-        "  ) = 1 AS enabled,",
         "  MIN(s.created_at) AS created_at,",
         "  MAX(s.updated_at) AS updated_at",
         "FROM skills s",
+        "WHERE s.tenant_id = $1",
         "GROUP BY s.skill_key",
         "ORDER BY created_at DESC"
-      ].join(" ")
+      ].join(" "),
+      [tenantId]
     );
 
     return result.rows.map((row) => ({
@@ -49,7 +44,6 @@ export async function listSkills(): Promise<SkillSummary[]> {
       name: row.name ?? row.skill_key,
       description: row.description,
       fileCount: row.file_count,
-      enabled: Boolean(row.enabled),
       createdAt: row.created_at.toISOString(),
       updatedAt: row.updated_at.toISOString()
     }));

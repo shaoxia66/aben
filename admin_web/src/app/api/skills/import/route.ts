@@ -41,6 +41,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const result = await importSkillFromZip({
+      tenantId: auth.context.tenantId,
       fileName,
       buffer: arrayBuffer
     });
@@ -63,4 +64,3 @@ export async function POST(request: NextRequest) {
     );
   }
 }
-

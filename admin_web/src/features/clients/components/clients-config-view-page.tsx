@@ -20,6 +20,20 @@ import { useEffect, useMemo, useState } from 'react';
 
 type ClientStatus = 'enabled' | 'disabled' | 'archived';
 
+type SkillSummary = {
+  skillKey: string;
+  name: string;
+};
+
+type ClientSkillBinding = {
+  id: string;
+  clientId: string;
+  skillKey: string;
+  skillName: string;
+  enabled: boolean;
+  orderNo: number;
+};
+
 type ClientRow = {
   id: string;
   tenantId: string;
@@ -38,6 +52,7 @@ type ClientRow = {
   capabilities: any;
   createdAt: string;
   updatedAt: string;
+  skills?: ClientSkillBinding[];
 };
 
 function formatDateTime(value: string | null) {
@@ -59,10 +74,16 @@ export default function ClientsConfigViewPage() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [statusUpdating, setStatusUpdating] = useState<Record<string, boolean>>({});
 
+  const [skills, setSkills] = useState<SkillSummary[]>([]);
+  const [skillsLoading, setSkillsLoading] = useState(false);
+  const [skillBindings, setSkillBindings] = useState<ClientSkillBinding[]>([]);
+  const [skillBindingsLoading, setSkillBindingsLoading] = useState(false);
+
   const [createOpen, setCreateOpen] = useState(false);
   const [createClientType, setCreateClientType] = useState('windows_agent');
   const [createName, setCreateName] = useState('');
   const [createDescription, setCreateDescription] = useState('');
+  const [createSkillKeys, setCreateSkillKeys] = useState<string[]>([]);
   const [createSubmitting, setCreateSubmitting] = useState(false);
   const [createdKey, setCreatedKey] = useState<string | null>(null);
 
@@ -70,11 +91,26 @@ export default function ClientsConfigViewPage() {
   const [editing, setEditing] = useState<ClientRow | null>(null);
   const [editName, setEditName] = useState('');
   const [editDescription, setEditDescription] = useState('');
+  const [editSkillKeys, setEditSkillKeys] = useState<string[]>([]);
   const [editSubmitting, setEditSubmitting] = useState(false);
 
   const sortedClients = useMemo(() => {
-    return [...clients].sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-  }, [clients]);
+    const bindingsByClientId: Record<string, ClientSkillBinding[]> = {};
+    for (const binding of skillBindings) {
+      if (!bindingsByClientId[binding.clientId]) bindingsByClientId[binding.clientId] = [];
+      bindingsByClientId[binding.clientId].push(binding);
+    }
+
+    return [...clients]
+      .map((c) => ({
+        ...c,
+        skills: (bindingsByClientId[c.id] || []).slice().sort((a, b) => {
+          if (a.orderNo !== b.orderNo) return a.orderNo - b.orderNo;
+          return a.skillName.localeCompare(b.skillName);
+        })
+      }))
+      .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+  }, [clients, skillBindings]);
 
   async function loadClients() {
     setLoading(true);
@@ -99,8 +135,67 @@ export default function ClientsConfigViewPage() {
     }
   }
 
+  async function loadSkills() {
+    setSkillsLoading(true);
+    try {
+      const response = await fetchWithTenantRefresh('/api/skills', { method: 'GET' });
+      const data = await response.json().catch(() => null);
+      if (!response.ok) return;
+      const list = Array.isArray(data?.skills) ? data.skills : [];
+      const normalized: SkillSummary[] = list
+        .filter((s: any) => s && typeof s === 'object' && typeof s.skillKey === 'string')
+        .map((s: any) => ({
+          skillKey: s.skillKey as string,
+          name:
+            typeof s.name === 'string' && s.name.trim()
+              ? (s.name as string)
+              : (s.skillKey as string)
+        }));
+      setSkills(normalized);
+    } catch {
+    } finally {
+      setSkillsLoading(false);
+    }
+  }
+
+  async function loadClientSkillBindings() {
+    setSkillBindingsLoading(true);
+    try {
+      const response = await fetchWithTenantRefresh('/api/client-skills', { method: 'GET' });
+      const data = await response.json().catch(() => null);
+      if (!response.ok) return;
+      const list = Array.isArray(data?.bindings) ? data.bindings : [];
+      const normalized: ClientSkillBinding[] = list
+        .filter(
+          (b: any) =>
+            b &&
+            typeof b === 'object' &&
+            typeof b.id === 'string' &&
+            typeof b.clientId === 'string' &&
+            typeof b.skillKey === 'string'
+        )
+        .map((b: any) => ({
+          id: b.id as string,
+          clientId: b.clientId as string,
+          skillKey: b.skillKey as string,
+          skillName:
+            typeof b.skillName === 'string' && b.skillName.trim()
+              ? (b.skillName as string)
+              : (b.skillKey as string),
+          enabled: Boolean(b.enabled),
+          orderNo: typeof b.orderNo === 'number' ? b.orderNo : 0
+        }));
+      setSkillBindings(normalized);
+    } catch {
+    } finally {
+      setSkillBindingsLoading(false);
+    }
+  }
+
   useEffect(() => {
     void loadClients();
+    void loadSkills();
+    void loadClientSkillBindings();
   }, []);
 
   async function setClientEnabled(row: ClientRow, enabled: boolean) {
@@ -181,7 +276,18 @@ export default function ClientsConfigViewPage() {
         setCreatedKey(created.authKey);
       }
 
+      if (created?.id && createSkillKeys.length > 0) {
+        try {
+          await fetchWithTenantRefresh(`/api/clients/${created.id}/skills`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ skillKeys: createSkillKeys })
+          });
+        } catch {}
+      }
+
       await loadClients();
+      await loadClientSkillBindings();
     } catch (err) {
       setErrorMessage(err instanceof Error ? err.message : '请求失败');
     } finally {
@@ -193,6 +299,7 @@ export default function ClientsConfigViewPage() {
     setEditing(row);
     setEditName(row.name);
     setEditDescription(row.description ?? '');
+    setEditSkillKeys((row.skills || []).map((b) => b.skillKey));
     setEditOpen(true);
     setErrorMessage(null);
   }
@@ -227,9 +334,20 @@ export default function ClientsConfigViewPage() {
         return;
       }
 
+      if (editing && editSkillKeys) {
+        try {
+          await fetchWithTenantRefresh(`/api/clients/${editing.id}/skills`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ skillKeys: editSkillKeys })
+          });
+        } catch {}
+      }
+
       setEditOpen(false);
       setEditing(null);
       await loadClients();
+      await loadClientSkillBindings();
     } catch (err) {
       setErrorMessage(err instanceof Error ? err.message : '请求失败');
     } finally {
@@ -281,6 +399,9 @@ export default function ClientsConfigViewPage() {
                 if (!open) {
                   setCreatedKey(null);
                   setErrorMessage(null);
+                  setCreateName('');
+                  setCreateDescription('');
+                  setCreateSkillKeys([]);
                 }
               }}
             >
@@ -315,6 +436,41 @@ export default function ClientsConfigViewPage() {
                       onChange={(e) => setCreateDescription(e.target.value)}
                       placeholder='可选'
                     />
+                  </div>
+                  <div className='grid gap-2'>
+                    <Label>绑定 Skills</Label>
+                    <div className='flex flex-wrap gap-2'>
+                      {skillsLoading ? (
+                        <span className='text-muted-foreground text-xs'>加载中…</span>
+                      ) : skills.length === 0 ? (
+                        <span className='text-muted-foreground text-xs'>当前租户暂无 skills</span>
+                      ) : (
+                        skills.map((skill) => {
+                          const checked = createSkillKeys.includes(skill.skillKey);
+                          return (
+                            <button
+                              key={skill.skillKey}
+                              type='button'
+                              className={cn(
+                                'rounded-full border px-3 py-1 text-xs',
+                                checked
+                                  ? 'border-primary bg-primary text-primary-foreground'
+                                  : 'border-border bg-background text-foreground'
+                              )}
+                              onClick={() => {
+                                setCreateSkillKeys((prev) =>
+                                  prev.includes(skill.skillKey)
+                                    ? prev.filter((k) => k !== skill.skillKey)
+                                    : [...prev, skill.skillKey]
+                                );
+                              }}
+                            >
+                              {skill.name}
+                            </button>
+                          );
+                        })
+                      )}
+                    </div>
                   </div>
                   {createdKey ? (
                     <div className='rounded-md border bg-muted/30 p-3'>
@@ -375,6 +531,7 @@ export default function ClientsConfigViewPage() {
                 <TableHead>描述</TableHead>
                 <TableHead>状态</TableHead>
                 <TableHead>运行状态</TableHead>
+                <TableHead>Skills</TableHead>
                 <TableHead>key</TableHead>
                 <TableHead>最近心跳</TableHead>
                 <TableHead className='text-right'>操作</TableHead>
@@ -404,8 +561,77 @@ export default function ClientsConfigViewPage() {
                         />
                       </div>
                     </TableCell>
-                      <TableCell className='text-muted-foreground max-w-[280px] align-top whitespace-normal break-words text-sm'>
+                    <TableCell className='text-muted-foreground max-w-[280px] align-top whitespace-normal break-words text-sm'>
                       {row.runStatus ?? '-'}
+                    </TableCell>
+                    <TableCell className='text-xs align-top'>
+                      {skillsLoading && skillBindingsLoading ? (
+                        <span className='text-muted-foreground text-xs'>加载中…</span>
+                      ) : !row.skills || row.skills.length === 0 ? (
+                        <span className='text-muted-foreground text-xs'>未绑定</span>
+                      ) : (
+                        <div className='flex max-w-[260px] flex-wrap gap-2'>
+                          {row.skills.map((binding) => (
+                            <div key={binding.id} className='inline-flex items-center gap-2'>
+                              <span className='text-xs'>{binding.skillName}</span>
+                              <Switch
+                                checked={binding.enabled}
+                                onCheckedChange={async (checked) => {
+                                  setSkillBindings((prev) =>
+                                    prev.map((b) =>
+                                      b.id === binding.id ? { ...b, enabled: checked } : b
+                                    )
+                                  );
+                                  try {
+                                    const response = await fetchWithTenantRefresh(
+                                      `/api/clients/${row.id}/skills/${encodeURIComponent(
+                                        binding.skillKey
+                                      )}`,
+                                      {
+                                        method: 'PATCH',
+                                        headers: { 'Content-Type': 'application/json' },
+                                        body: JSON.stringify({ enabled: checked })
+                                      }
+                                    );
+                                    if (!response.ok) {
+                                      setSkillBindings((prev) =>
+                                        prev.map((b) =>
+                                          b.id === binding.id ? { ...b, enabled: !checked } : b
+                                        )
+                                      );
+                                    } else {
+                                      const data = await response.json().catch(() => null);
+                                      const updated = data?.binding;
+                                      if (updated?.id) {
+                                        setSkillBindings((prev) =>
+                                          prev.map((b) =>
+                                            b.id === updated.id
+                                              ? {
+                                                  ...b,
+                                                  enabled: Boolean(updated.enabled),
+                                                  orderNo:
+                                                    typeof updated.orderNo === 'number'
+                                                      ? updated.orderNo
+                                                      : b.orderNo
+                                                }
+                                              : b
+                                          )
+                                        );
+                                      }
+                                    }
+                                  } catch {
+                                    setSkillBindings((prev) =>
+                                      prev.map((b) =>
+                                        b.id === binding.id ? { ...b, enabled: !checked } : b
+                                      )
+                                    );
+                                  }
+                                }}
+                              />
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </TableCell>
                     <TableCell className='font-mono text-xs'>{maskKey(row.authKey)}</TableCell>
                     <TableCell className='text-xs'>{formatDateTime(row.lastSeenAt)}</TableCell>
@@ -471,6 +697,41 @@ export default function ClientsConfigViewPage() {
               <div className='grid gap-2'>
                 <Label>description</Label>
                 <Input value={editDescription} onChange={(e) => setEditDescription(e.target.value)} />
+              </div>
+              <div className='grid gap-2'>
+                <Label>绑定 Skills</Label>
+                <div className='flex flex-wrap gap-2'>
+                  {skillsLoading ? (
+                    <span className='text-muted-foreground text-xs'>加载中…</span>
+                  ) : skills.length === 0 ? (
+                    <span className='text-muted-foreground text-xs'>当前租户暂无 skills</span>
+                  ) : (
+                    skills.map((skill) => {
+                      const checked = editSkillKeys.includes(skill.skillKey);
+                      return (
+                        <button
+                          key={skill.skillKey}
+                          type='button'
+                          className={cn(
+                            'rounded-full border px-3 py-1 text-xs',
+                            checked
+                              ? 'border-primary bg-primary text-primary-foreground'
+                              : 'border-border bg-background text-foreground'
+                          )}
+                          onClick={() => {
+                            setEditSkillKeys((prev) =>
+                              prev.includes(skill.skillKey)
+                                ? prev.filter((k) => k !== skill.skillKey)
+                                : [...prev, skill.skillKey]
+                            );
+                          }}
+                        >
+                          {skill.name}
+                        </button>
+                      );
+                    })
+                  )}
+                </div>
               </div>
               <div className='grid gap-2'>
                 <Label>认证 Key</Label>

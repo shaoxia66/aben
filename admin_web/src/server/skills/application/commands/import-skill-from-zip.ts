@@ -64,6 +64,7 @@ function normalizePath(path: string): string {
 }
 
 export async function importSkillFromZip(params: {
+  tenantId: string;
   fileName: string;
   buffer: ArrayBuffer;
 }): Promise<{ skillKey: string; fileCount: number }> {
@@ -174,6 +175,7 @@ export async function importSkillFromZip(params: {
 
   await withTransaction(async (client) => {
     await replaceSkillFiles(client, {
+      tenantId: params.tenantId,
       skillKey,
       files: filesForInsert
     });
