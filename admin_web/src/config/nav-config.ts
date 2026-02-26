@@ -76,8 +76,8 @@ export const navItems: NavItem[] = [
     // access: { requireOrg: true, permission: 'org:teams:view' }
   },
   {
-    title: '产品',
-    url: '/dashboard/product',
+    title: 'Skills 仓库',
+    url: '/dashboard/skills-hub',
     icon: 'product',
     shortcut: ['p', 'p'],
     isActive: false,

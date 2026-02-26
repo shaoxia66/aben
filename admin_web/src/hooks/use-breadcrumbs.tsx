@@ -15,9 +15,9 @@ const routeMapping: Record<string, BreadcrumbItem[]> = {
     { title: '控制台', link: '/dashboard' },
     { title: '员工', link: '/dashboard/employee' }
   ],
-  '/dashboard/product': [
+  '/dashboard/skills-hub': [
     { title: '控制台', link: '/dashboard' },
-    { title: '产品', link: '/dashboard/product' }
+    { title: 'Skills 仓库', link: '/dashboard/skills-hub' }
   ]
 };
 
