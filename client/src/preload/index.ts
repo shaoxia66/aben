@@ -18,6 +18,11 @@ const API = {
     offsetX?: number
     offsetY?: number
   }) => ipcRenderer.send('widget:drag', payload),
+  // 设置相关
+  getApiKey: (): Promise<string> => ipcRenderer.invoke('settings:getApiKey'),
+  saveApiKey: (key: string): Promise<{ success: boolean }> =>
+    ipcRenderer.invoke('settings:saveApiKey', key),
+  closeSettings: () => ipcRenderer.invoke('settings:close'),
 }
 
 contextBridge.exposeInMainWorld('App', API)

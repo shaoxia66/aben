@@ -1,16 +1,17 @@
-import { BrowserWindow, ipcMain, screen } from 'electron'
+import { BrowserWindow, Menu, MenuItem, ipcMain, screen } from 'electron'
 import { join } from 'node:path'
 
 import { createWindow } from 'lib/electron-app/factories/windows/create'
 import { ENVIRONMENT } from 'shared/constants'
 import { displayName } from '~/package.json'
+import { openSettingsWindow } from './settings'
 
 export async function MainWindow() {
   const window = createWindow({
     id: 'main',
     title: displayName,
-    width: 140,
-    height: 140,
+    width: 180,
+    height: 180,
     show: false,
     center: false,
     movable: true,
@@ -46,23 +47,45 @@ export async function MainWindow() {
     )
   }
 
-  placeAtBottomRight(140, 140)
+  placeAtBottomRight(180, 180)
+
+  // 右键菜单
+  window.webContents.on('context-menu', () => {
+    const menu = new Menu()
+    menu.append(
+      new MenuItem({
+        label: '⚙️  设置',
+        click: () => openSettingsWindow(),
+      })
+    )
+    menu.popup({ window })
+  })
+
+  const resizeWindow = (w: number, h: number) => {
+    if (window.isDestroyed()) return
+    // 始终以窗口右下角（助手图标所在角）为锚点调整尺寸，位置不变
+    const bounds = window.getBounds()
+    const rightEdge = bounds.x + bounds.width
+    const bottomEdge = bounds.y + bounds.height
+    window.setBounds({ x: rightEdge - w, y: bottomEdge - h, width: w, height: h }, false)
+  }
 
   ipcMain.removeHandler('widget:setMode')
   ipcMain.handle(
     'widget:setMode',
     async (_event, mode: 'compact' | 'expanded') => {
       if (window.isDestroyed()) return
-      if (mode === 'expanded') placeAtBottomRight(460, 340)
-      else placeAtBottomRight(140, 140)
+      if (mode === 'expanded') resizeWindow(460, 340)
+      else resizeWindow(180, 180)
     }
   )
 
   ipcMain.removeAllListeners('widget:drag')
-  const dragState: { dragging: boolean; offsetX: number; offsetY: number } = {
+  const dragState: { dragging: boolean; offsetX: number; offsetY: number; moved: boolean } = {
     dragging: false,
     offsetX: 0,
     offsetY: 0,
+    moved: false,
   }
   ipcMain.on(
     'widget:drag',
@@ -79,6 +102,7 @@ export async function MainWindow() {
       if (window.isDestroyed()) return
       if (payload.phase === 'start') {
         dragState.dragging = true
+        dragState.moved = false
         dragState.offsetX =
           typeof payload.offsetX === 'number' ? payload.offsetX : 0
         dragState.offsetY =
@@ -92,6 +116,7 @@ export async function MainWindow() {
       if (!dragState.dragging) return
       const nextX = Math.round(payload.screenX - dragState.offsetX)
       const nextY = Math.round(payload.screenY - dragState.offsetY)
+      dragState.moved = true
       window.setPosition(nextX, nextY, false)
     }
   )

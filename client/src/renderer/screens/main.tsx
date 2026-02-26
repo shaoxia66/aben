@@ -132,7 +132,7 @@ export function MainScreen() {
             }}
             type="button"
           >
-            <RobotIcon className="h-16 w-16 text-teal-300 drop-shadow-sm" />
+            <RobotIcon className="h-20 w-20 text-teal-300 drop-shadow-sm" />
           </button>
         </div>
       </div>

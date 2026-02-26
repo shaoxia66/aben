@@ -36,6 +36,7 @@
     "clsx": "^2.1.1",
     "electron-router-dom": "^2.1.0",
     "lucide-react": "^0.556.0",
+    "radix-ui": "^1.4.3",
     "react": "^19.2.1",
     "react-dom": "^19.2.1",
     "react-router-dom": "^7.10.1",
