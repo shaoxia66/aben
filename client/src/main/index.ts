@@ -7,6 +7,9 @@ import { loadReactDevtools } from 'lib/electron-app/utils'
 import { ENVIRONMENT } from 'shared/constants'
 import { MainWindow } from './windows/main'
 import { waitFor } from 'shared/utils'
+import { registerAgentIpc } from './agent'
+
+registerAgentIpc()
 
 app.commandLine.appendSwitch('no-sandbox')
 if (ENVIRONMENT.IS_DEV) {

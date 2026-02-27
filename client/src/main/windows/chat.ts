@@ -6,6 +6,11 @@ import { ENVIRONMENT } from 'shared/constants'
 
 let chatWindow: Electron.BrowserWindow | null = null
 
+ipcMain.removeHandler('chat:open')
+ipcMain.handle('chat:open', () => {
+    openChatWindow()
+})
+
 ipcMain.removeHandler('chat:close')
 ipcMain.handle('chat:close', () => {
     if (chatWindow && !chatWindow.isDestroyed()) {

@@ -32,16 +32,21 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@langchain/core": "^1.1.29",
+    "@langchain/openai": "^1.2.11",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "deepagents": "^1.8.1",
     "electron-router-dom": "^2.1.0",
+    "langchain": "^1.2.28",
     "lucide-react": "^0.556.0",
     "radix-ui": "^1.4.3",
     "react": "^19.2.1",
     "react-dom": "^19.2.1",
     "react-router-dom": "^7.10.1",
     "tailwind-merge": "^3.4.0",
-    "tailwindcss-animate": "^1.0.7"
+    "tailwindcss-animate": "^1.0.7",
+    "zod": "^4.3.6"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.3.8",

@@ -21,6 +21,11 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd())
   const adminApiUrl = env.VITE_ADMIN_API_URL ?? ''
 
+  // 把关键环境变量写回 process.env，这样 Electron 子进程可以直接继承读到
+  if (adminApiUrl) {
+    process.env.VITE_ADMIN_API_URL = adminApiUrl
+  }
+
   return {
     main: {
       mode: 'es2022',
@@ -28,6 +33,7 @@ export default defineConfig(({ mode }) => {
 
       define: {
         'import.meta.env.VITE_ADMIN_API_URL': JSON.stringify(adminApiUrl),
+        'process.env.VITE_ADMIN_API_URL': JSON.stringify(adminApiUrl),
       },
 
       build: {

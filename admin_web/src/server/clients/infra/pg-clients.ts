@@ -436,3 +436,78 @@ export async function rotateClientAuthKey(
     extra: row.extra ?? {}
   };
 }
+
+/** 通过 auth_key 查找客户端（不限租户，跨租户唯一索引保证安全） */
+export async function findClientByAuthKey(
+  client: PoolClient,
+  authKey: string
+): Promise<PgClient | null> {
+  const result = await client.query<{
+    id: string;
+    tenant_id: string;
+    client_type: string;
+    code: string;
+    name: string;
+    description: string | null;
+    auth_key: string;
+    auth_key_last_used_at: Date | null;
+    status: PgClient["status"];
+    version: string | null;
+    platform: string | null;
+    last_seen_at: Date | null;
+    run_status: string | null;
+    config: unknown;
+    capabilities: unknown;
+    created_by: string | null;
+    updated_by: string | null;
+    created_at: Date;
+    updated_at: Date;
+    extra: unknown;
+  }>(
+    [
+      "SELECT id, tenant_id, client_type, code, name, description, auth_key, auth_key_last_used_at, status, version, platform, last_seen_at, run_status, config, capabilities, created_by, updated_by, created_at, updated_at, extra",
+      "FROM clients",
+      "WHERE auth_key = $1",
+      "LIMIT 1"
+    ].join(" "),
+    [authKey]
+  );
+
+  const row = result.rows[0];
+  if (!row) return null;
+
+  return {
+    id: row.id,
+    tenantId: row.tenant_id,
+    clientType: row.client_type,
+    code: row.code,
+    name: row.name,
+    description: row.description,
+    authKey: row.auth_key,
+    authKeyLastUsedAt: row.auth_key_last_used_at ? row.auth_key_last_used_at.toISOString() : null,
+    status: row.status,
+    version: row.version,
+    platform: row.platform,
+    lastSeenAt: row.last_seen_at ? row.last_seen_at.toISOString() : null,
+    runStatus: row.run_status,
+    config: row.config ?? {},
+    capabilities: row.capabilities ?? {},
+    createdBy: row.created_by,
+    updatedBy: row.updated_by,
+    createdAt: row.created_at.toISOString(),
+    updatedAt: row.updated_at.toISOString(),
+    extra: row.extra ?? {}
+  };
+}
+
+/** 更新 auth_key_last_used_at（fire-and-forget，不阻塞响应） */
+export async function touchClientAuthKeyLastUsedAt(
+  client: PoolClient,
+  clientId: string
+): Promise<void> {
+  await client.query(
+    "UPDATE clients SET auth_key_last_used_at = NOW() WHERE id = $1",
+    [clientId]
+  );
+}
+

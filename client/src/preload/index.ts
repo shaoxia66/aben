@@ -22,8 +22,28 @@ const API = {
   getApiKey: (): Promise<string> => ipcRenderer.invoke('settings:getApiKey'),
   saveApiKey: (key: string): Promise<{ success: boolean }> =>
     ipcRenderer.invoke('settings:saveApiKey', key),
+  deleteApiKey: (): Promise<{ success: boolean }> =>
+    ipcRenderer.invoke('settings:deleteApiKey'),
   closeSettings: () => ipcRenderer.invoke('settings:close'),
+  openChat: () => ipcRenderer.invoke('chat:open'),
   closeChat: () => ipcRenderer.invoke('chat:close'),
+  // Agent 对话（streaming）
+  agentSend: (message: string) => ipcRenderer.invoke('agent:send', { message }),
+  onAgentChunk: (cb: (chunk: string) => void) => {
+    const handler = (_: Electron.IpcRendererEvent, chunk: string) => cb(chunk)
+    ipcRenderer.on('agent:chunk', handler)
+    return () => ipcRenderer.off('agent:chunk', handler)
+  },
+  onAgentDone: (cb: () => void) => {
+    const handler = () => cb()
+    ipcRenderer.once('agent:done', handler)
+    return () => ipcRenderer.off('agent:done', handler)
+  },
+  onAgentError: (cb: (err: string) => void) => {
+    const handler = (_: Electron.IpcRendererEvent, err: string) => cb(err)
+    ipcRenderer.once('agent:error', handler)
+    return () => ipcRenderer.off('agent:error', handler)
+  },
 }
 
 contextBridge.exposeInMainWorld('App', API)

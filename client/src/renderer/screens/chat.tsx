@@ -64,20 +64,55 @@ export function ChatScreen() {
         if (!text || loading) return
 
         setInput('')
+        // 重置 textarea 高度
+        if (inputRef.current) {
+            inputRef.current.style.height = 'auto'
+        }
+
         const userMsg: Message = { id: uid(), role: 'user', content: text, ts: Date.now() }
-        setMessages(prev => [...prev, userMsg])
+        const assistantId = uid()
+        const assistantMsg: Message = { id: assistantId, role: 'assistant', content: '', ts: Date.now() }
+
+        setMessages(prev => [...prev, userMsg, assistantMsg])
         setLoading(true)
 
-        // 模拟请求
-        await new Promise(r => setTimeout(r, 800))
-        const replyMsg: Message = {
-            id: uid(),
-            role: 'assistant',
-            content: `收到你的指令：\n\n${text}\n\n当前尚未连接真实接口。你可以继续说明任务需求。`,
-            ts: Date.now(),
+        // 注册 streaming 监听
+        const offChunk = App.onAgentChunk((chunk: string) => {
+            setMessages(prev =>
+                prev.map(m =>
+                    m.id === assistantId ? { ...m, content: m.content + chunk } : m
+                )
+            )
+        })
+        const offDone = App.onAgentDone(() => {
+            offChunk()
+            setLoading(false)
+        })
+        const offError = App.onAgentError((err: string) => {
+            offChunk()
+            setMessages(prev =>
+                prev.map(m =>
+                    m.id === assistantId
+                        ? { ...m, content: `[错误] ${err}` }
+                        : m
+                )
+            )
+            setLoading(false)
+        })
+
+        try {
+            await App.agentSend(text)
+        } catch (e) {
+            offChunk(); offDone(); offError()
+            setMessages(prev =>
+                prev.map(m =>
+                    m.id === assistantId
+                        ? { ...m, content: '[错误] 发送失败，请检查连接' }
+                        : m
+                )
+            )
+            setLoading(false)
         }
-        setMessages(prev => [...prev, replyMsg])
-        setLoading(false)
     }
 
     const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
