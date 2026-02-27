@@ -7,3 +7,8 @@ export const PLATFORM = {
   IS_WINDOWS: process.platform === 'win32',
   IS_LINUX: process.platform === 'linux',
 }
+
+/** 后端管理端地址，从环境变量 VITE_ADMIN_API_URL 读取 */
+export const ADMIN_API_URL: string =
+  // biome-ignore lint/suspicious/noExplicitAny: env injection
+  (import.meta as any).env?.VITE_ADMIN_API_URL ?? ''

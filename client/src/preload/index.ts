@@ -23,6 +23,7 @@ const API = {
   saveApiKey: (key: string): Promise<{ success: boolean }> =>
     ipcRenderer.invoke('settings:saveApiKey', key),
   closeSettings: () => ipcRenderer.invoke('settings:close'),
+  closeChat: () => ipcRenderer.invoke('chat:close'),
 }
 
 contextBridge.exposeInMainWorld('App', API)

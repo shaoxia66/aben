@@ -5,6 +5,7 @@ import { createWindow } from 'lib/electron-app/factories/windows/create'
 import { ENVIRONMENT } from 'shared/constants'
 import { displayName } from '~/package.json'
 import { openSettingsWindow } from './settings'
+import { openChatWindow } from './chat'
 
 export async function MainWindow() {
   const window = createWindow({
@@ -52,6 +53,12 @@ export async function MainWindow() {
   // 右键菜单
   window.webContents.on('context-menu', () => {
     const menu = new Menu()
+    menu.append(
+      new MenuItem({
+        label: '💬  打开对话',
+        click: () => openChatWindow(),
+      })
+    )
     menu.append(
       new MenuItem({
         label: '⚙️  设置',
