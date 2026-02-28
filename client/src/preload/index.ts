@@ -44,6 +44,16 @@ const API = {
     ipcRenderer.once('agent:error', handler)
     return () => ipcRenderer.off('agent:error', handler)
   },
+  onAgentToolStart: (cb: (payload: { name: string; input: unknown }) => void) => {
+    const handler = (_: Electron.IpcRendererEvent, payload: { name: string; input: unknown }) => cb(payload)
+    ipcRenderer.on('agent:tool_start', handler)
+    return () => ipcRenderer.off('agent:tool_start', handler)
+  },
+  onAgentToolEnd: (cb: (payload: { name: string; output: unknown }) => void) => {
+    const handler = (_: Electron.IpcRendererEvent, payload: { name: string; output: unknown }) => cb(payload)
+    ipcRenderer.on('agent:tool_end', handler)
+    return () => ipcRenderer.off('agent:tool_end', handler)
+  },
 }
 
 contextBridge.exposeInMainWorld('App', API)

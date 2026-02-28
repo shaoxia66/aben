@@ -9,13 +9,14 @@ import { join } from 'node:path'
 import { readFileSync, existsSync } from 'node:fs'
 import { ChatOpenAI } from '@langchain/openai'
 import { createDeepAgent, LocalShellBackend } from 'deepagents'
+import { initMcpTools } from './tools/mcp'
 
 // ── 读取本地密钥 ──────────────────────────────────────────────────
 function readLocalAuthKey(): string {
     try {
         const file = join(app.getPath('userData'), 'aben-key.json')
         if (!existsSync(file)) return ''
-        const data = JSON.parse(readFileSync(file, 'utf-8')) as { key?: string }
+        const data = JSON.parse(readFileSync(file, 'utf-8'))
         return typeof data.key === 'string' ? data.key : ''
     } catch {
         return ''
@@ -38,14 +39,18 @@ type AgentIdentity = {
     tenantName: string
 }
 
+// ── 发送请求拉取后台 llm-config.json ──────────────────────────────
 let cachedLlmConfig: LlmConfig | null = null
 let cachedIdentity: AgentIdentity | null = null
 
 async function fetchLlmConfig(): Promise<{ llm: LlmConfig; identity: AgentIdentity } | null> {
-    if (cachedLlmConfig && cachedIdentity) return { llm: cachedLlmConfig, identity: cachedIdentity }
+    // 优先返回内存缓存
+    if (cachedLlmConfig && cachedIdentity) {
+        return { llm: cachedLlmConfig, identity: cachedIdentity }
+    }
 
     const authKey = readLocalAuthKey()
-    const adminUrl = process.env.VITE_ADMIN_API_URL ?? ''
+    const adminUrl = 'http://localhost:3000'
 
     if (!authKey || !adminUrl) return null
 
@@ -61,7 +66,7 @@ async function fetchLlmConfig(): Promise<{ llm: LlmConfig; identity: AgentIdenti
             tenant?: { name?: string }
         }
         if (json.defaultConfig) {
-            cachedLlmConfig = json.defaultConfig
+            cachedLlmConfig = json.defaultConfig as LlmConfig
             cachedIdentity = {
                 clientName: json.client?.clientName ?? '',
                 clientType: json.client?.clientType ?? '',
@@ -84,11 +89,12 @@ export function clearAgentLlmCache() {
     cachedIdentity = null
 }
 
-// ── 创建 Agent（懒初始化） ─────────────────────────────────────────
+// ── 缓存 agent 实例与 LLM 配置 ──────────────────────────────────────
 type DeepAgent = ReturnType<typeof createDeepAgent>
 let agentInstance: DeepAgent | null = null
 
-async function getOrCreateAgent(): Promise<{ agent: DeepAgent; error?: never } | { agent?: never; error: string }> {
+export async function getOrCreateAgent(): Promise<{ agent: NonNullable<typeof agentInstance> } | { error: string }> {
+    // 复用之前的 Agent 实例，避免重复创建（包含重复加载 backend 导致多次依赖下载问题）
     if (agentInstance) return { agent: agentInstance }
 
     const result = await fetchLlmConfig()
@@ -97,7 +103,9 @@ async function getOrCreateAgent(): Promise<{ agent: DeepAgent; error?: never } |
     }
     const { llm: llmConfig, identity } = result
     if (!llmConfig.apiKey) {
-        return { error: 'LLM 配置中缺少 API Key' }
+        return {
+            error: 'LLM 配置中缺少 API Key'
+        }
     }
 
     // DeepSeek 兼容 OpenAI 接口
@@ -114,7 +122,7 @@ async function getOrCreateAgent(): Promise<{ agent: DeepAgent; error?: never } |
     // 用 clientName / tenantName / description 构建个性化 system prompt
     const agentName = identity.clientName || 'Aben'
     const tenantLabel = identity.tenantName ? `（来自 ${identity.tenantName}）` : ''
-    const clientTypeLabel = identity.clientType ? `，设备类型：${identity.clientType}` : ''
+    const typeStr = identity.clientType ? `，设备类型：${identity.clientType}` : ''
     const descriptionLine = identity.clientDescription
         ? `\n\n关于你自己：${identity.clientDescription}`
         : ''
@@ -132,10 +140,13 @@ async function getOrCreateAgent(): Promise<{ agent: DeepAgent; error?: never } |
         inheritEnv: true,
     })
 
+    const tools = await initMcpTools()
+
     agentInstance = createDeepAgent({
         model: llm,
         systemPrompt,
         backend,
+        tools
     })
 
     console.log(`[Agent] 初始化完成 | 名称: ${agentName} | 租户: ${identity.tenantName} | provider: ${llmConfig.provider} | model: ${llmConfig.modelName} | backend: LocalShellBackend(${homeDir})`)
@@ -167,25 +178,35 @@ export function registerAgentIpc() {
                 chatWin.webContents.send('agent:error', err)
             }
         }
+        const sendToolStart = (name: string, input: unknown) => {
+            if (chatWin && !chatWin.isDestroyed()) {
+                chatWin.webContents.send('agent:tool_start', { name, input })
+            }
+        }
+        const sendToolEnd = (name: string, output: unknown) => {
+            if (chatWin && !chatWin.isDestroyed()) {
+                chatWin.webContents.send('agent:tool_end', { name, output })
+            }
+        }
 
         const result = await getOrCreateAgent()
-        if ('error' in result && result.error) {
+        if ('error' in result) {
             sendError(result.error)
             return
         }
 
-        const { agent } = result
+        const agent = result.agent
 
         try {
             console.log('[Agent] 收到消息:', message.slice(0, 60))
 
-            // 使用 streamEvents 精准捕获 LLM token
             const eventStream = agent!.streamEvents(
                 { messages: [{ role: 'user', content: message }] },
                 { version: 'v2' }
             )
 
             for await (const event of eventStream) {
+                // LLM token 流
                 if (
                     event.event === 'on_chat_model_stream' &&
                     event.data?.chunk?.content
@@ -194,13 +215,28 @@ export function registerAgentIpc() {
                     if (typeof content === 'string' && content) {
                         sendChunk(content)
                     } else if (Array.isArray(content)) {
-                        // Anthropic 格式：[{ type: 'text', text: '...' }]
                         for (const part of content) {
                             if (part?.type === 'text' && part.text) {
                                 sendChunk(part.text)
                             }
                         }
                     }
+                }
+
+                // 工具开始调用
+                if (event.event === 'on_tool_start') {
+                    const toolName = event.name ?? 'unknown'
+                    const input = event.data?.input ?? {}
+                    console.log(`[Agent] 工具调用: ${toolName}`, JSON.stringify(input).slice(0, 120))
+                    sendToolStart(toolName, input)
+                }
+
+                // 工具执行完毕
+                if (event.event === 'on_tool_end') {
+                    const toolName = event.name ?? 'unknown'
+                    const output = event.data?.output ?? ''
+                    console.log(`[Agent] 工具完成: ${toolName}`)
+                    sendToolEnd(toolName, output)
                 }
             }
 

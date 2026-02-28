@@ -31,4 +31,11 @@ makeAppWithSingleInstanceLock(async () => {
       window.webContents.reload()
     })
   }
+
+  app.on('will-quit', async () => {
+    try {
+      const { closeMcp } = await import('./tools/mcp')
+      await closeMcp()
+    } catch { }
+  })
 })
