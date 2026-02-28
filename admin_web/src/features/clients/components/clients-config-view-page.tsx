@@ -18,6 +18,7 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/componen
 import { Badge } from '@/components/ui/badge';
 import { cn, fetchWithTenantRefresh } from '@/lib/utils';
 import { useEffect, useMemo, useState } from 'react';
+import { useMqttStore } from '@/app/shared/store/mqtt';
 
 type ClientStatus = 'enabled' | 'disabled' | 'archived';
 
@@ -115,6 +116,22 @@ export default function ClientsConfigViewPage() {
   const [editSkillKeys, setEditSkillKeys] = useState<string[]>([]);
   const [editMcpKeys, setEditMcpKeys] = useState<string[]>([]);
   const [editSubmitting, setEditSubmitting] = useState(false);
+
+  // MQTT quick task inputs
+  const [taskInputs, setTaskInputs] = useState<Record<string, string>>({});
+
+  // MQTT Client Presence (We removed client-side WS tracking since WS port is blocked)
+  // We now rely entirely on DB load via 'runStatus'
+
+  useEffect(() => {
+    void loadClients();
+    // 页面挂载和聚焦时重新拉取在线状态
+    const handleFocus = () => loadClients();
+    window.addEventListener('focus', handleFocus);
+    return () => {
+      window.removeEventListener('focus', handleFocus);
+    };
+  }, []);
 
   const sortedClients = useMemo(() => {
     const bindingsByClientId: Record<string, ClientSkillBinding[]> = {};
@@ -280,7 +297,6 @@ export default function ClientsConfigViewPage() {
   }
 
   useEffect(() => {
-    void loadClients();
     void loadSkills();
     void loadClientSkillBindings();
     void loadMcps();
@@ -691,7 +707,7 @@ export default function ClientsConfigViewPage() {
                         <span
                           className={[
                             'inline-block h-2 w-2 rounded-full',
-                            isOnline ? 'bg-green-500' : 'bg-muted-foreground/40'
+                            isOnline ? 'bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]' : 'bg-muted-foreground/40'
                           ].join(' ')}
                           title={isOnline ? '在线' : '离线'}
                         />
@@ -717,21 +733,21 @@ export default function ClientsConfigViewPage() {
                       <span className='flex-1 truncate font-mono text-xs'>{maskKey(row.authKey)}</span>
                     </div>
 
-                    {/* 最近心跳 */}
+                    {/* 最近心跳 (采用 DB DB/Server同步的 lastSeenAt) */}
                     <div className='flex items-center gap-2'>
                       <span className='text-muted-foreground w-14 shrink-0 text-xs'>心跳</span>
-                      <span className='text-muted-foreground text-xs'>{formatDateTime(row.lastSeenAt)}</span>
+                      <span className='text-muted-foreground text-xs'>
+                        {formatDateTime(row.lastSeenAt)}
+                      </span>
                     </div>
 
                     {/* 运行状态 */}
-                    {row.runStatus && (
-                      <div className='flex items-center gap-2'>
-                        <span className='text-muted-foreground w-14 shrink-0 text-xs'>状态</span>
-                        <Badge variant={isOnline ? 'default' : 'outline'} className='text-xs'>
-                          {row.runStatus}
-                        </Badge>
-                      </div>
-                    )}
+                    <div className='flex items-center gap-2'>
+                      <span className='text-muted-foreground w-14 shrink-0 text-xs'>状态</span>
+                      <Badge variant={isOnline ? 'default' : 'outline'} className='text-xs'>
+                        {isOnline ? '在线' : '未连接'}
+                      </Badge>
+                    </div>
 
                     {/* Skills 绑定 */}
                     <div>
@@ -870,6 +886,57 @@ export default function ClientsConfigViewPage() {
                         </div>
                       )}
                     </div>
+
+                    {/* 测试: 远程指令下发 */}
+                    {isOnline && (
+                      <div className='mt-4 flex flex-col gap-2 rounded-md bg-muted/30 p-2'>
+                        <span className='text-xs text-muted-foreground'>远程下发任务 (MQTT)</span>
+                        <div className='flex gap-2'>
+                          <Input
+                            placeholder='输入让 Agent 执行的任务'
+                            className='h-8 text-xs'
+                            value={taskInputs[row.id] || ''}
+                            onChange={(e) => setTaskInputs(prev => ({ ...prev, [row.id]: e.target.value }))}
+                            onKeyDown={async (e) => {
+                              if (e.key === 'Enter') {
+                                const val = taskInputs[row.id]?.trim();
+                                if (val) {
+                                  try {
+                                    await fetchWithTenantRefresh(`/api/clients/${row.id}/command`, {
+                                      method: 'POST',
+                                      headers: { 'Content-Type': 'application/json' },
+                                      body: JSON.stringify({ action: 'START_TASK', payload: { task: val } })
+                                    });
+                                  } catch (e) {
+                                    setErrorMessage('发送指令失败');
+                                  }
+                                  setTaskInputs(prev => ({ ...prev, [row.id]: '' }));
+                                }
+                              }
+                            }}
+                          />
+                          <Button
+                            size='sm'
+                            className='h-8 text-xs shrink-0'
+                            disabled={!taskInputs[row.id]?.trim()}
+                            onClick={async () => {
+                              try {
+                                await fetchWithTenantRefresh(`/api/clients/${row.id}/command`, {
+                                  method: 'POST',
+                                  headers: { 'Content-Type': 'application/json' },
+                                  body: JSON.stringify({ action: 'START_TASK', payload: { task: taskInputs[row.id]?.trim() } })
+                                });
+                              } catch (e) {
+                                setErrorMessage('发送指令失败');
+                              }
+                              setTaskInputs(prev => ({ ...prev, [row.id]: '' }));
+                            }}
+                          >
+                            发送
+                          </Button>
+                        </div>
+                      </div>
+                    )}
                   </CardContent>
 
                   <CardFooter className='flex flex-wrap gap-2 border-t pt-3'>

@@ -167,6 +167,76 @@ export async function getOrCreateAgent(): Promise<{ agent: NonNullable<typeof ag
     return { agent: agentInstance }
 }
 
+// ── 独立执行 Agent 逻辑 (供 IPC 和 MQTT 调用) ───────────────────────────────────
+export async function runDeepAgent(
+    message: string,
+    callbacks?: {
+        onChunk?: (chunk: string) => void
+        onDone?: () => void
+        onError?: (err: string) => void
+        onToolStart?: (name: string, input: unknown) => void
+        onToolEnd?: (name: string, output: unknown) => void
+    }
+) {
+    const result = await getOrCreateAgent()
+    if ('error' in result) {
+        callbacks?.onError?.(result.error)
+        return
+    }
+
+    const agent = result.agent
+
+    try {
+        console.log('[Agent] 收到指令:', message.slice(0, 60))
+
+        // @ts-ignore - Bypass deepagents strict tuple type checking 
+        const eventStream = agent!.streamEvents(
+            { messages: [{ role: 'user', content: message }] } as any,
+            { version: 'v2' }
+        )
+
+        for await (const event of eventStream) {
+            // LLM token 流
+            if (
+                event.event === 'on_chat_model_stream' &&
+                event.data?.chunk?.content
+            ) {
+                const content = event.data.chunk.content
+                if (typeof content === 'string' && content) {
+                    callbacks?.onChunk?.(content)
+                } else if (Array.isArray(content)) {
+                    for (const part of content) {
+                        if (part?.type === 'text' && part.text) {
+                            callbacks?.onChunk?.(part.text)
+                        }
+                    }
+                }
+            }
+
+            // 工具开始调用
+            if (event.event === 'on_tool_start') {
+                const toolName = event.name ?? 'unknown'
+                const input = event.data?.input ?? {}
+                console.log(`[Agent] 工具调用: ${toolName}`, JSON.stringify(input).slice(0, 120))
+                callbacks?.onToolStart?.(toolName, input)
+            }
+
+            // 工具执行完毕
+            if (event.event === 'on_tool_end') {
+                const toolName = event.name ?? 'unknown'
+                const output = event.data?.output ?? ''
+                console.log(`[Agent] 工具完成: ${toolName}`)
+                callbacks?.onToolEnd?.(toolName, output)
+            }
+        }
+
+        callbacks?.onDone?.()
+    } catch (err) {
+        console.error('[Agent] 运行出错:', err)
+        callbacks?.onError?.(err instanceof Error ? err.message : String(err))
+    }
+}
+
 // ── IPC: chat:send（streaming） ───────────────────────────────────
 export function registerAgentIpc() {
     ipcMain.removeHandler('agent:send')
@@ -203,61 +273,12 @@ export function registerAgentIpc() {
             }
         }
 
-        const result = await getOrCreateAgent()
-        if ('error' in result) {
-            sendError(result.error)
-            return
-        }
-
-        const agent = result.agent
-
-        try {
-            console.log('[Agent] 收到消息:', message.slice(0, 60))
-
-            const eventStream = agent!.streamEvents(
-                { messages: [{ role: 'user', content: message }] },
-                { version: 'v2' }
-            )
-
-            for await (const event of eventStream) {
-                // LLM token 流
-                if (
-                    event.event === 'on_chat_model_stream' &&
-                    event.data?.chunk?.content
-                ) {
-                    const content = event.data.chunk.content
-                    if (typeof content === 'string' && content) {
-                        sendChunk(content)
-                    } else if (Array.isArray(content)) {
-                        for (const part of content) {
-                            if (part?.type === 'text' && part.text) {
-                                sendChunk(part.text)
-                            }
-                        }
-                    }
-                }
-
-                // 工具开始调用
-                if (event.event === 'on_tool_start') {
-                    const toolName = event.name ?? 'unknown'
-                    const input = event.data?.input ?? {}
-                    console.log(`[Agent] 工具调用: ${toolName}`, JSON.stringify(input).slice(0, 120))
-                    sendToolStart(toolName, input)
-                }
-
-                // 工具执行完毕
-                if (event.event === 'on_tool_end') {
-                    const toolName = event.name ?? 'unknown'
-                    const output = event.data?.output ?? ''
-                    console.log(`[Agent] 工具完成: ${toolName}`)
-                    sendToolEnd(toolName, output)
-                }
-            }
-
-            sendDone()
-        } catch (err) {
-            console.error('[Agent] 运行出错:', err)
-            sendError(err instanceof Error ? err.message : String(err))
-        }
+        await runDeepAgent(message, {
+            onChunk: sendChunk,
+            onDone: sendDone,
+            onError: sendError,
+            onToolStart: sendToolStart,
+            onToolEnd: sendToolEnd
+        })
     })
 }

@@ -510,4 +510,26 @@ export async function touchClientAuthKeyLastUsedAt(
     [clientId]
   );
 }
+export async function updateClientPresenceByCode(
+  client: PoolClient,
+  params: { code: string; runStatus: string; timestamp?: number }
+): Promise<void> {
+  const ts = params.timestamp ? new Date(params.timestamp) : new Date();
 
+  // Is it a valid UUID?
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  const isUuid = uuidRegex.test(params.code);
+
+  if (isUuid) {
+    await client.query(
+      "UPDATE clients SET run_status = $1, last_seen_at = $2 WHERE id = $3 OR code = $3",
+      [params.runStatus, ts, params.code]
+    );
+  } else {
+    // If not a UUID, only match against `code` (which is text)
+    await client.query(
+      "UPDATE clients SET run_status = $1, last_seen_at = $2 WHERE code = $3",
+      [params.runStatus, ts, params.code]
+    );
+  }
+}

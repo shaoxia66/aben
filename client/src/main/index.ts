@@ -8,6 +8,7 @@ import { ENVIRONMENT } from 'shared/constants'
 import { MainWindow } from './windows/main'
 import { waitFor } from 'shared/utils'
 import { registerAgentIpc } from './agent'
+import { initMqtt, closeMqtt } from './mqtt'
 
 registerAgentIpc()
 
@@ -18,6 +19,10 @@ if (ENVIRONMENT.IS_DEV) {
 
 makeAppWithSingleInstanceLock(async () => {
   await app.whenReady()
+
+  // 必须在 app.whenReady() 之后才能调用 electron.net
+  initMqtt().catch(err => console.error('[MQTT] 初始化连接报错', err))
+
   const window = await makeAppSetup(MainWindow)
 
   if (ENVIRONMENT.IS_DEV) {
@@ -36,6 +41,7 @@ makeAppWithSingleInstanceLock(async () => {
     try {
       const { closeMcp } = await import('./tools/mcp')
       await closeMcp()
+      closeMqtt()
     } catch { }
   })
 })
