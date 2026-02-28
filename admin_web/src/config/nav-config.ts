@@ -61,6 +61,11 @@ export const navItems: NavItem[] = [
         title: 'Skills 管理',
         url: '/dashboard/workspaces/skills',
         icon: 'settings'
+      },
+      {
+        title: 'MCP 管理',
+        url: '/dashboard/workspaces/mcps',
+        icon: 'settings'
       }
     ]
   },
@@ -80,6 +85,14 @@ export const navItems: NavItem[] = [
     url: '/dashboard/skills-hub',
     icon: 'product',
     shortcut: ['p', 'p'],
+    isActive: false,
+    items: []
+  },
+  {
+    title: 'MCP 仓库',
+    url: '/dashboard/mcp-hub',
+    icon: 'product',
+    shortcut: ['c', 'c'],
     isActive: false,
     items: []
   },

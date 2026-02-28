@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { requireClientAuth } from "@/server/auth/infra/require-client-auth";
 import { withTransaction } from "@/server/shared/db/pg";
 import { listLlmProviderConfigsByTenantId } from "@/server/llm-config/infra/pg-llm-provider-configs";
+import { getActiveMcpsForClient } from "@/server/clients/infra/pg-client-mcps";
 
 export const runtime = "nodejs";
 
@@ -41,10 +42,11 @@ export async function GET(request: Request) {
 
     const { tenantId, clientId, clientName, clientDescription, clientType, code } = auth.context;
 
-    // 2. 并行查：LLM 配置 + 租户名
-    const [configs, tenantName] = await Promise.all([
+    // 2. 并行查：LLM 配置 + 租户名 + 启用的 MCP
+    const [configs, tenantName, mcps] = await Promise.all([
         withTransaction(async (client) => listLlmProviderConfigsByTenantId(client, tenantId)),
         fetchTenantName(tenantId),
+        withTransaction(async (client) => getActiveMcpsForClient(client, { tenantId, clientId })),
     ]);
 
     const enabled = configs.filter((c) => c.status === "enabled");
@@ -85,6 +87,7 @@ export async function GET(request: Request) {
             id: tenantId,
             name: tenantName,     // ← 租户名称
         },
+        mcps,
         configs: result,
         defaultConfig: result.find((c) => c.isDefault) ?? result[0] ?? null,
     });

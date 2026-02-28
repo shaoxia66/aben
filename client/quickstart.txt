@@ -1,0 +1,235 @@
+Quickstart - Docs by LangChain(function(a,b){try{let c=document.getElementById("banner")?.innerText;if(c){for(let d=0;d(function(a,b,c,d){try{if(window.matchMedia("(max-width: 1024px)").matches){document.documentElement.style.setProperty(c,"0px"),document.documentElement.setAttribute("data-assistant-state","closed");return}let e=localStorage.getItem(a);if(null===e){document.documentElement.style.setProperty(c,"0px"),document.documentElement.setAttribute("data-assistant-state","closed");return}let f=JSON.parse(e),g=localStorage.getItem(b),h=null!==g?JSON.parse(g):d;document.documentElement.style.setProperty(c,f?h+"px":"0px"),document.documentElement.setAttribute("data-assistant-state",f?"open":"closed")}catch(a){document.documentElement.style.setProperty(c,"0px"),document.documentElement.setAttribute("data-assistant-state","closed")}})(
+  "chat-assistant-sheet-open",
+  "chat-assistant-sheet-width",
+  "--assistant-sheet-width",
+  368
+)((a,b,c,d,e,f,g,h)=>{let i=document.documentElement,j=["light","dark"];function k(b){var c;(Array.isArray(a)?a:[a]).forEach(a=>{let c="class"===a,d=c&&f?e.map(a=>f[a]||a):e;c?(i.classList.remove(...d),i.classList.add(f&&f[b]?f[b]:b)):i.setAttribute(a,b)}),c=b,h&&j.includes(c)&&(i.style.colorScheme=c)}if(d)k(d);else try{let a=localStorage.getItem(b)||c,d=g&&"system"===a?window.matchMedia("(prefers-color-scheme: dark)").matches?"dark":"light":a;k(d)}catch(a){}})("class","isDarkMode","system",null,["dark","light","true","false","system"],{"true":"dark","false":"light","dark":"dark","light":"light"},true,true):root{--banner-height:0px!important}(self.__next_s=self.__next_s||[]).push([0,{"children":"(function j(a,b,c,d,e){try{let f,g,h=[];try{h=window.location.pathname.split(\"/\").filter(a=>\"\"!==a&&\"global\"!==a).slice(0,2)}catch{h=[]}let i=h.find(a=>c.includes(a)),j=[];for(let c of(i?j.push(i):j.push(b),j.push(\"global\"),j)){if(!c)continue;let b=a[c];if(b?.content){f=b.content,g=c;break}}if(!f)return void document.documentElement.setAttribute(d,\"hidden\");let k=!0,l=0;for(;l:root {
+  --font-family-headings-custom: "Manrope", -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+  
+  
+  
+  
+}
+:root {
+    --primary: 47 104 104;
+    --primary-light: 132 196 192;
+    --primary-dark: 28 60 60;
+    --tooltip-foreground: 255 255 255;
+    --background-light: 255 255 255;
+    --background-dark: 11 13 15;
+    --gray-50: 244 246 246;
+    --gray-100: 239 241 241;
+    --gray-200: 223 225 225;
+    --gray-300: 207 209 209;
+    --gray-400: 159 161 161;
+    --gray-500: 113 115 115;
+    --gray-600: 81 83 83;
+    --gray-700: 63 65 65;
+    --gray-800: 38 40 40;
+    --gray-900: 24 25 25;
+    --gray-950: 11 13 13;
+  }
+          (function() {
+            function loadKatex() {
+              const link = document.querySelector('link[href="https://d4tuoctqmanu0.cloudfront.net/katex.min.css"]');
+              if (link) link.rel = 'stylesheet';
+            }
+            if (document.readyState === 'loading') {
+              document.addEventListener('DOMContentLoaded', loadKatex);
+            } else {
+              loadKatex();
+            }
+          })();
+        (self.__next_s=self.__next_s||[]).push([0,{"suppressHydrationWarning":true,"children":"(function(a,b,c,d){var e;let f,g=\"mint\"===d||\"linden\"===d?\"sidebar\":\"sidebar-content\",h=(e=d,f=\"navbar-transition\",\"maple\"===e&&(f+=\"-maple\"),(\"willow\"===e||\"new-willow\"===e)&&(f+=\"-willow\"),f),[i,j]=(()=>{switch(d){case\"almond\":return[\"[--scroll-mt:2.5rem]\",\"[--scroll-mt:2.5rem]\"];case\"luma\":return[\"lg:[--scroll-mt:6rem]\",\"lg:[--scroll-mt:6rem]\"];case\"sequoia\":return[\"lg:[--scroll-mt:8.5rem]\",\"lg:[--scroll-mt:11rem]\"];default:return[\"lg:[--scroll-mt:9.5rem]\",\"lg:[--scroll-mt:12rem]\"]}})();function k(){document.documentElement.classList.add(i)}function l(a){document.getElementById(g)?.style.setProperty(\"top\",`${a}rem`)}function m(a){document.getElementById(g)?.style.setProperty(\"height\",`calc(100vh - ${a}rem)`)}function n(a,b){!a&&b||a&&!b?(k(),document.documentElement.classList.remove(j)):a&&b&&(document.documentElement.classList.add(j),document.documentElement.classList.remove(i))}let o=document.documentElement.getAttribute(\"data-banner-state\"),p=null!=o?\"visible\"===o:b;switch(d){case\"mint\":l(c),n(a,p);break;case\"palm\":case\"aspen\":case\"sequoia\":l(c),m(c),n(a,p);break;case\"luma\":k();break;case\"linden\":l(c),p&&k();break;case\"almond\":k(),l(c),m(c)}let q=function(){let a=document.createElement(\"style\");return a.appendChild(document.createTextNode(\"*,*::before,*::after{-webkit-transition:none!important;-moz-transition:none!important;-o-transition:none!important;-ms-transition:none!important;transition:none!important}\")),document.head.appendChild(a),function(){window.getComputedStyle(document.body),setTimeout(()=>{document.head.removeChild(a)},1)}}();(\"requestAnimationFrame\"in globalThis?requestAnimationFrame:setTimeout)(()=>{let a;a=!1,a=window.scrollY>50,document.getElementById(h)?.setAttribute(\"data-is-opaque\",`${!!a}`),q()})})(\n  true,\n  false,\n  (function m(a,b,c){let d=document.documentElement.getAttribute(\"data-banner-state\"),e=2.5*!!(null!=d?\"visible\"===d:b),f=3*!!a,g=4,h=e+g+f;switch(c){case\"mint\":case\"palm\":break;case\"aspen\":f=2.5*!!a,g=3.5,h=e+f+g;break;case\"luma\":g=3,h=e+g;break;case\"linden\":g=4,h=e+g;break;case\"almond\":g=3.5,h=e+g;break;case\"sequoia\":f=3*!!a,g=3,h=e+g+f}return h})(true, false, \"aspen\"),\n  \"aspen\",\n)","id":"_mintlify-scroll-top-script"}])Skip to main contenthtml{--assistant-sheet-width:0px!important}Docs by LangChain home pageOpen sourceSearch...⌘KAsk AI
+GitHub
+Try LangSmith
+Try LangSmith
+Search...NavigationGet startedQuickstartDeep AgentsLangChainLangGraphIntegrationsLearnReferenceContributePython
+OverviewGet startedQuickstartCustomizationComparisonCore capabilitiesOverviewBackendsSubagentsHuman-in-the-loopLong-term memorySkillsSandboxesStreamingOverviewFrontendProtocolsAgent Client Protocol (ACP)Command line interfaceUse the CLIModel providers(self.__next_s=self.__next_s||[]).push([0,{"children":"document.documentElement.setAttribute('data-page-mode', 'none');","id":"_mintlify-page-mode-script"}])(self.__next_s=self.__next_s||[]).push([0,{"suppressHydrationWarning":true,"children":"(function n(a,b){let c=\"maple\"===b||\"willow\"===b||\"new-willow\"===b||\"almond\"===b||\"luma\"===b||\"sequoia\"===b;if(!document.getElementById(\"footer\")?.classList.contains(\"advanced-footer\")||c)return;let d=document.documentElement.getAttribute(\"data-page-mode\"),e=document.getElementById(\"navbar\"),f=document.getElementById(\"navigation-items\"),g=document.getElementById(\"sidebar\"),h=document.getElementById(\"footer\"),i=document.getElementById(\"table-of-contents-content\"),j=16*a;if(!h||\"center\"===d)return;let k=h.getBoundingClientRect().top,l=window.innerHeight-k,m=(f?.clientHeight??0)+j+32*(\"mint\"===b||\"linden\"===b);if(g&&f)if(l>0){let a=Math.max(0,m-k);g.style.bottom=`${l}px`,g.style.top=`${j-a}px`}else g.style.bottom=\"\",g.style.top=`${a}rem`,g.style.height=\"auto\";i&&e&&(l>0?i.style.top=\"custom\"===d?`${e.clientHeight-l}px`:`${40+e.clientHeight-l}px`:i.style.top=\"\")})(\n  (function m(a,b,c){let d=document.documentElement.getAttribute(\"data-banner-state\"),e=2.5*!!(null!=d?\"visible\"===d:b),f=3*!!a,g=4,h=e+g+f;switch(c){case\"mint\":case\"palm\":break;case\"aspen\":f=2.5*!!a,g=3.5,h=e+f+g;break;case\"luma\":g=3,h=e+g;break;case\"linden\":g=4,h=e+g;break;case\"almond\":g=3.5,h=e+g;break;case\"sequoia\":f=3*!!a,g=3,h=e+g+f}return h})(true, false, \"aspen\"),\n  \"aspen\",\n)","id":"_mintlify-footer-and-sidebar-scroll-script"}])/* Make sidebar title heavier weight */
+#sidebar-title {
+    font-weight: 600 !important;
+  }
+
+/* Inline code links have same color and underline as regular links */
+a code,
+a[href] code {
+  color: inherit !important;
+  text-decoration: none !important; /* Remove underline from code itself */
+  padding: 0 !important; /* Remove padding to prevent gaps in parent link underline */
+}
+
+/* Ensure callout links and lists match callout text formatting */
+.callout a,
+[class*="callout"] a {
+  font-size: inherit !important; /* Match callout text size */
+  color: inherit !important; /* Match callout text color */
+}
+
+.callout ul,
+.callout ol,
+.callout li,
+[class*="callout"] ul,
+[class*="callout"] ol,
+[class*="callout"] li {
+  font-size: inherit !important; /* Match callout text size */
+  color: inherit !important; /* Match callout text color */
+  line-height: inherit !important; /* Match callout line height */
+}
+
+.callout p,
+[class*="callout"] p {
+  font-size: inherit !important; /* Match callout text size */
+  color: inherit !important; /* Match callout text color */
+}
+
+/* Ensure bold and italic text inherit callout formatting */
+.callout strong,
+.callout b,
+.callout em,
+.callout i,
+[class*="callout"] strong,
+[class*="callout"] b,
+[class*="callout"] em,
+[class*="callout"] i {
+  font-size: inherit !important; /* Match callout text size */
+  color: inherit !important; /* Match callout text color */
+}
+
+/* Ensure mermaid diagrams are centered */
+.mermaid {
+    text-align: center;
+    display: flex;
+    justify-content: center;
+  }
+
+/* Fix vertical alignment in table cells with mixed content (text and images) */
+.prose table td, article table td, .markdown table td, .content table td, [class*="prose"] table td,
+.prose table th, article table th, .markdown table th, .content table th, [class*="prose"] table th {
+  vertical-align: middle !important; /* Center align content vertically */
+  line-height: 1.5 !important; /* Consistent line height */
+}
+
+/* Hide pagination */
+#pagination {
+    display: none;
+  }
+
+/* Improve banner link readability in light mode */
+#banner a {
+  color: inherit !important;
+  text-decoration: none !important;
+}
+
+/* Compact first column for multi agent pattern comparison tables (no horizontal scroll) */
+.compact-first-col [data-table-wrapper] {
+  overflow-x: visible !important;
+}
+
+.compact-first-col table {
+  table-layout: auto !important;
+  width: 100% !important;
+}
+
+.compact-first-col table td,
+.compact-first-col table th {
+  min-width: 0 !important;
+}
+
+.compact-first-col table td:first-child,
+.compact-first-col table th:first-child {
+  width: 1% !important;
+  white-space: nowrap !important;
+}
+
+/* Hide auto-generated callouts on home page */
+.home-page ~ :is(.callout, [data-callout-type]) {
+  display: none !important;
+}
+
+/* Force vertical alignment to top for table cells on products page */
+.products-page table td.tdlist,
+.products-page table th.tdlist {
+  vertical-align: top !important;
+}On this pagePrerequisitesStep 1: Install dependenciesStep 2: Set up your API keysStep 3: Create a search toolStep 4: Create a deep agentStep 5: Run the agentHow does it work?ExamplesStreamingNext stepsGet startedQuickstartCopy pageBuild your first deep agent in minutes
+Copy pageThis guide walks you through creating your first deep agent with planning, file system tools, and subagent capabilities. You’ll build a research agent that can conduct research and write reports.
+​Prerequisites
+Before you begin, make sure you have an API key from a model provider (e.g., Anthropic, OpenAI).
+Deep agents require a model that supports tool calling. See customization for how to configure your model.
+​Step 1: Install dependencies
+pipuvCopypip install deepagents tavily-python
+
+This guide uses Tavily as an example search provider, but you can substitute any search API (e.g., DuckDuckGo, SerpAPI, Brave Search).
+​Step 2: Set up your API keys
+Copyexport ANTHROPIC_API_KEY=&quot;your-api-key&quot;
+export TAVILY_API_KEY=&quot;your-tavily-api-key&quot;
+
+​Step 3: Create a search tool
+Copyimport os
+from typing import Literal
+from tavily import TavilyClient
+from deepagents import create_deep_agent
+
+tavily_client = TavilyClient(api_key=os.environ[&quot;TAVILY_API_KEY&quot;])
+
+def internet_search(
+    query: str,
+    max_results: int = 5,
+    topic: Literal[&quot;general&quot;, &quot;news&quot;, &quot;finance&quot;] = &quot;general&quot;,
+    include_raw_content: bool = False,
+):
+    &quot;&quot;&quot;Run a web search&quot;&quot;&quot;
+    return tavily_client.search(
+        query,
+        max_results=max_results,
+        include_raw_content=include_raw_content,
+        topic=topic,
+    )
+
+​Step 4: Create a deep agent
+Copy# System prompt to steer the agent to be an expert researcher
+research_instructions = &quot;&quot;&quot;You are an expert researcher. Your job is to conduct thorough research and then write a polished report.
+
+You have access to an internet search tool as your primary means of gathering information.
+
+## `internet_search`
+
+Use this to run an internet search for a given query. You can specify the max number of results to return, the topic, and whether raw content should be included.
+&quot;&quot;&quot;
+
+agent = create_deep_agent(
+    tools=[internet_search],
+    system_prompt=research_instructions
+)
+
+​Step 5: Run the agent
+Copyresult = agent.invoke({&quot;messages&quot;: [{&quot;role&quot;: &quot;user&quot;, &quot;content&quot;: &quot;What is langgraph?&quot;}]})
+
+# Print the agent&#x27;s response
+print(result[&quot;messages&quot;][-1].content)
+
+​How does it work?
+Your deep agent automatically:
+
+Plans its approach using the built-in write_todos tool to break down the research task.
+Conducts research by calling the internet_search tool to gather information.
+Manages context by using file system tools (write_file, read_file) to offload large search results.
+Spawns subagents as needed to delegate complex subtasks to specialized subagents.
+Synthesizes a report to compile findings into a coherent response.
+
+​Examples
+For agents, patterns, and applications you can build with Deep Agents, see Examples.
+​Streaming
+Deep agents have built-in streaming for real-time updates from agent execution using LangGraph.
+This allows you to observe output progressively and review and debug agent and subagent work, such as tool calls, tool results, and LLM responses.
+​Next steps
+Now that you’ve built your first deep agent:
+
+Customize your agent: Learn about customization options, including custom system prompts, tools, and subagents.
+Add long-term memory: Enable persistent memory across conversations.
+Deploy to production: Learn about deployment options for LangGraph applications.
+
+
+Edit this page on GitHub or file an issue.
+Connect these docs to Claude, VSCode, and more via MCP for real-time answers.Was this page helpful?
+YesNoDeep Agents overviewPreviousCustomize Deep AgentsNext⌘IDocs by LangChain home pagegithubxlinkedinyoutubeResources
+Company

@@ -69,6 +69,8 @@ function ToolStepCard({ msg }: { msg: ToolStepMessage }) {
     const label = toolLabel(msg.toolName)
     const summary = toolSummary(msg.toolName, msg.input)
     let outputStr = ''
+    let isError = false
+
     if (msg.output != null) {
         if (typeof msg.output === 'string') {
             outputStr = msg.output
@@ -95,12 +97,17 @@ function ToolStepCard({ msg }: { msg: ToolStepMessage }) {
                 }
             }
         }
+
+        // 简单判断是否出错
+        if (outputStr.includes('【工具执行出错】') || outputStr.includes('【状态异常】')) {
+            isError = true
+        }
     }
     return (
         <div className="flex items-start gap-2 py-0.5">
             {/* 左侧连接线 + 图标 */}
             <div className="flex flex-col items-center shrink-0 self-stretch ml-1">
-                <div className={`w-[6px] h-[6px] rounded-full mt-[7px] shrink-0 ${running ? 'bg-amber-400 animate-pulse' : 'bg-emerald-400'}`} />
+                <div className={`w-[6px] h-[6px] rounded-full mt-[7px] shrink-0 ${running ? 'bg-amber-400 animate-pulse' : isError ? 'bg-red-400' : 'bg-emerald-400'}`} />
             </div>
 
             <button
@@ -112,7 +119,9 @@ function ToolStepCard({ msg }: { msg: ToolStepMessage }) {
                     {/* 工具名 */}
                     <span className={`text-[11px] font-medium font-mono px-1.5 py-0.5 rounded ${running
                         ? 'bg-amber-500/10 text-amber-400/90 border border-amber-500/20'
-                        : 'bg-white/[0.04] text-white/40 border border-white/[0.06]'}`}>
+                        : isError
+                            ? 'bg-red-500/10 text-red-400/90 border border-red-500/20'
+                            : 'bg-white/[0.04] text-white/40 border border-white/[0.06]'}`}>
                         {label}
                     </span>
                     {/* 摘要 */}
@@ -139,9 +148,9 @@ function ToolStepCard({ msg }: { msg: ToolStepMessage }) {
 
                 {/* 展开的输出内容 */}
                 {expanded && !running && outputStr && (
-                    <div className="mt-1.5 rounded-md bg-black/25 border border-white/[0.05] px-3 py-2 font-mono text-[11px] text-white/50 whitespace-pre-wrap break-all leading-relaxed max-h-40 overflow-y-auto">
+                    <div className={`mt-1.5 rounded-md px-3 py-2 font-mono text-[11px] whitespace-pre-wrap break-all leading-relaxed max-h-40 overflow-y-auto ${isError ? 'bg-red-500/10 border border-red-500/20 text-red-200/80' : 'bg-black/25 border border-white/[0.05] text-white/50'}`}>
                         {outputStr.slice(0, 2000)}
-                        {outputStr.length > 2000 && <span className="text-white/25">…（截断）</span>}
+                        {outputStr.length > 2000 && <span className={isError ? "text-red-200/50" : "text-white/25"}>…（截断）</span>}
                     </div>
                 )}
             </button>
@@ -261,11 +270,26 @@ export function ChatScreen() {
 
         const offDone = App.onAgentDone(() => {
             offChunk(); offToolStart(); offToolEnd()
+            setMessages(prev => prev.map(m => {
+                if (m.type === 'tool' && m.output === null) {
+                    return { ...m, output: '【状态异常】: 工具未能在 Agent 结束前返回结果。' }
+                }
+                return m
+            }))
             setLoading(false)
         })
 
         const offError = App.onAgentError((err: string) => {
             offChunk(); offToolStart(); offToolEnd()
+
+            // 标记所有尚未完成的工具为出错状态
+            setMessages(prev => prev.map(m => {
+                if (m.type === 'tool' && m.output === null) {
+                    return { ...m, output: `【工具执行出错】: 整个 Agent 发生意外错误中断。\n原因: ${err}` }
+                }
+                return m
+            }))
+
             setMessages(prev => {
                 // 找最后一条 assistant 文字气泡写错误
                 const idx = [...prev].reverse().findIndex(m => m.type === 'text' && m.role === 'assistant')

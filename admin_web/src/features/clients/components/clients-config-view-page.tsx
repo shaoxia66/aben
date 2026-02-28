@@ -14,7 +14,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import { cn, fetchWithTenantRefresh } from '@/lib/utils';
 import { useEffect, useMemo, useState } from 'react';
 
@@ -32,6 +33,19 @@ type ClientSkillBinding = {
   skillName: string;
   enabled: boolean;
   orderNo: number;
+};
+
+type McpSummary = {
+  mcpKey: string;
+  name: string;
+};
+
+type ClientMcpBinding = {
+  id: string;
+  clientId: string;
+  mcpKey: string;
+  mcpName: string;
+  isEnabled: boolean;
 };
 
 type ClientRow = {
@@ -53,6 +67,7 @@ type ClientRow = {
   createdAt: string;
   updatedAt: string;
   skills?: ClientSkillBinding[];
+  mcps?: ClientMcpBinding[];
 };
 
 function formatDateTime(value: string | null) {
@@ -79,11 +94,17 @@ export default function ClientsConfigViewPage() {
   const [skillBindings, setSkillBindings] = useState<ClientSkillBinding[]>([]);
   const [skillBindingsLoading, setSkillBindingsLoading] = useState(false);
 
+  const [mcps, setMcps] = useState<McpSummary[]>([]);
+  const [mcpsLoading, setMcpsLoading] = useState(false);
+  const [mcpBindings, setMcpBindings] = useState<ClientMcpBinding[]>([]);
+  const [mcpBindingsLoading, setMcpBindingsLoading] = useState(false);
+
   const [createOpen, setCreateOpen] = useState(false);
   const [createClientType, setCreateClientType] = useState('windows_agent');
   const [createName, setCreateName] = useState('');
   const [createDescription, setCreateDescription] = useState('');
   const [createSkillKeys, setCreateSkillKeys] = useState<string[]>([]);
+  const [createMcpKeys, setCreateMcpKeys] = useState<string[]>([]);
   const [createSubmitting, setCreateSubmitting] = useState(false);
   const [createdKey, setCreatedKey] = useState<string | null>(null);
 
@@ -92,6 +113,7 @@ export default function ClientsConfigViewPage() {
   const [editName, setEditName] = useState('');
   const [editDescription, setEditDescription] = useState('');
   const [editSkillKeys, setEditSkillKeys] = useState<string[]>([]);
+  const [editMcpKeys, setEditMcpKeys] = useState<string[]>([]);
   const [editSubmitting, setEditSubmitting] = useState(false);
 
   const sortedClients = useMemo(() => {
@@ -101,16 +123,25 @@ export default function ClientsConfigViewPage() {
       bindingsByClientId[binding.clientId].push(binding);
     }
 
+    const mcpBindingsByClientId: Record<string, ClientMcpBinding[]> = {};
+    for (const binding of mcpBindings) {
+      if (!mcpBindingsByClientId[binding.clientId]) mcpBindingsByClientId[binding.clientId] = [];
+      mcpBindingsByClientId[binding.clientId].push(binding);
+    }
+
     return [...clients]
       .map((c) => ({
         ...c,
         skills: (bindingsByClientId[c.id] || []).slice().sort((a, b) => {
           if (a.orderNo !== b.orderNo) return a.orderNo - b.orderNo;
           return a.skillName.localeCompare(b.skillName);
+        }),
+        mcps: (mcpBindingsByClientId[c.id] || []).slice().sort((a, b) => {
+          return a.mcpName.localeCompare(b.mcpName);
         })
       }))
       .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
-  }, [clients, skillBindings]);
+  }, [clients, skillBindings, mcpBindings]);
 
   async function loadClients() {
     setLoading(true);
@@ -192,10 +223,68 @@ export default function ClientsConfigViewPage() {
     }
   }
 
+  async function loadMcps() {
+    setMcpsLoading(true);
+    try {
+      const response = await fetchWithTenantRefresh('/api/mcps', { method: 'GET' });
+      const data = await response.json().catch(() => null);
+      if (!response.ok) return;
+      const list = Array.isArray(data?.mcps) ? data.mcps : [];
+      const normalized: McpSummary[] = list
+        .filter((m: any) => m && typeof m === 'object' && typeof m.mcpKey === 'string')
+        .map((m: any) => ({
+          mcpKey: m.mcpKey as string,
+          name:
+            typeof m.name === 'string' && m.name.trim()
+              ? (m.name as string)
+              : (m.mcpKey as string)
+        }));
+      setMcps(normalized);
+    } catch {
+    } finally {
+      setMcpsLoading(false);
+    }
+  }
+
+  async function loadClientMcpBindings() {
+    setMcpBindingsLoading(true);
+    try {
+      const response = await fetchWithTenantRefresh('/api/client-mcps', { method: 'GET' });
+      const data = await response.json().catch(() => null);
+      if (!response.ok) return;
+      const list = Array.isArray(data?.bindings) ? data.bindings : [];
+      const normalized: ClientMcpBinding[] = list
+        .filter(
+          (b: any) =>
+            b &&
+            typeof b === 'object' &&
+            typeof b.id === 'string' &&
+            typeof b.clientId === 'string' &&
+            typeof b.mcpKey === 'string'
+        )
+        .map((b: any) => ({
+          id: b.id as string,
+          clientId: b.clientId as string,
+          mcpKey: b.mcpKey as string,
+          mcpName:
+            typeof b.mcpName === 'string' && b.mcpName.trim()
+              ? (b.mcpName as string)
+              : (b.mcpKey as string),
+          isEnabled: Boolean(b.isEnabled)
+        }));
+      setMcpBindings(normalized);
+    } catch {
+    } finally {
+      setMcpBindingsLoading(false);
+    }
+  }
+
   useEffect(() => {
     void loadClients();
     void loadSkills();
     void loadClientSkillBindings();
+    void loadMcps();
+    void loadClientMcpBindings();
   }, []);
 
   async function setClientEnabled(row: ClientRow, enabled: boolean) {
@@ -283,11 +372,22 @@ export default function ClientsConfigViewPage() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ skillKeys: createSkillKeys })
           });
-        } catch {}
+        } catch { }
+      }
+
+      if (created?.id && createMcpKeys.length > 0) {
+        try {
+          await fetchWithTenantRefresh(`/api/clients/${created.id}/mcps`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ mcpKeys: createMcpKeys })
+          });
+        } catch { }
       }
 
       await loadClients();
       await loadClientSkillBindings();
+      await loadClientMcpBindings();
     } catch (err) {
       setErrorMessage(err instanceof Error ? err.message : '请求失败');
     } finally {
@@ -300,6 +400,7 @@ export default function ClientsConfigViewPage() {
     setEditName(row.name);
     setEditDescription(row.description ?? '');
     setEditSkillKeys((row.skills || []).map((b) => b.skillKey));
+    setEditMcpKeys((row.mcps || []).map((b) => b.mcpKey));
     setEditOpen(true);
     setErrorMessage(null);
   }
@@ -341,13 +442,24 @@ export default function ClientsConfigViewPage() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ skillKeys: editSkillKeys })
           });
-        } catch {}
+        } catch { }
+      }
+
+      if (editing && editMcpKeys) {
+        try {
+          await fetchWithTenantRefresh(`/api/clients/${editing.id}/mcps`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ mcpKeys: editMcpKeys })
+          });
+        } catch { }
       }
 
       setEditOpen(false);
       setEditing(null);
       await loadClients();
       await loadClientSkillBindings();
+      await loadClientMcpBindings();
     } catch (err) {
       setErrorMessage(err instanceof Error ? err.message : '请求失败');
     } finally {
@@ -373,7 +485,7 @@ export default function ClientsConfigViewPage() {
       if (key) {
         try {
           await navigator.clipboard.writeText(key);
-        } catch {}
+        } catch { }
       }
       await loadClients();
     } catch (err) {
@@ -402,6 +514,7 @@ export default function ClientsConfigViewPage() {
                   setCreateName('');
                   setCreateDescription('');
                   setCreateSkillKeys([]);
+                  setCreateMcpKeys([]);
                 }
               }}
             >
@@ -472,6 +585,41 @@ export default function ClientsConfigViewPage() {
                       )}
                     </div>
                   </div>
+                  <div className='grid gap-2'>
+                    <Label>绑定 MCPs</Label>
+                    <div className='flex flex-wrap gap-2'>
+                      {mcpsLoading ? (
+                        <span className='text-muted-foreground text-xs'>加载中…</span>
+                      ) : mcps.length === 0 ? (
+                        <span className='text-muted-foreground text-xs'>当前租户暂无 MCPs</span>
+                      ) : (
+                        mcps.map((mcp) => {
+                          const checked = createMcpKeys.includes(mcp.mcpKey);
+                          return (
+                            <button
+                              key={mcp.mcpKey}
+                              type='button'
+                              className={cn(
+                                'rounded-full border px-3 py-1 text-xs',
+                                checked
+                                  ? 'border-primary bg-primary text-primary-foreground'
+                                  : 'border-border bg-background text-foreground'
+                              )}
+                              onClick={() => {
+                                setCreateMcpKeys((prev) =>
+                                  prev.includes(mcp.mcpKey)
+                                    ? prev.filter((k) => k !== mcp.mcpKey)
+                                    : [...prev, mcp.mcpKey]
+                                );
+                              }}
+                            >
+                              {mcp.name}
+                            </button>
+                          );
+                        })
+                      )}
+                    </div>
+                  </div>
                   {createdKey ? (
                     <div className='rounded-md border bg-muted/30 p-3'>
                       <div className='flex items-center justify-between gap-2'>
@@ -482,7 +630,7 @@ export default function ClientsConfigViewPage() {
                           onClick={async () => {
                             try {
                               await navigator.clipboard.writeText(createdKey);
-                            } catch {}
+                            } catch { }
                           }}
                         >
                           复制
@@ -522,60 +670,84 @@ export default function ClientsConfigViewPage() {
           </div>
         ) : null}
 
-        <div className='rounded-md border'>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>类型</TableHead>
-                <TableHead>名称</TableHead>
-                <TableHead>描述</TableHead>
-                <TableHead>状态</TableHead>
-                <TableHead>运行状态</TableHead>
-                <TableHead>Skills</TableHead>
-                <TableHead>key</TableHead>
-                <TableHead>最近心跳</TableHead>
-                <TableHead className='text-right'>操作</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {sortedClients.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={8} className='text-muted-foreground py-8 text-center text-sm'>
-                    暂无客户端
-                  </TableCell>
-                </TableRow>
-              ) : (
-                sortedClients.map((row) => (
-                  <TableRow key={row.id}>
-                    <TableCell>{row.clientType}</TableCell>
-                    <TableCell>{row.name}</TableCell>
-                      <TableCell className='text-muted-foreground max-w-[360px] align-top whitespace-normal break-words text-sm'>
-                        {row.description ?? '-'}
-                      </TableCell>
-                    <TableCell>
-                      <div className='flex items-center gap-2'>
+        {sortedClients.length === 0 && !loading ? (
+          <div className='text-muted-foreground flex h-40 items-center justify-center rounded-md border text-sm'>
+            暂无客户端，点击右上角"新建客户端"进行添加
+          </div>
+        ) : (
+          <div className='*:data-[slot=card]:from-primary/5 *:data-[slot=card]:to-card dark:*:data-[slot=card]:bg-card *:data-[slot=card]:bg-gradient-to-t *:data-[slot=card]:shadow-xs grid gap-4 md:grid-cols-2 xl:grid-cols-3'>
+            {sortedClients.map((row) => {
+              const isOnline = row.runStatus === 'online' || row.runStatus === 'running';
+              const isArchived = row.status === 'archived';
+              return (
+                <Card key={row.id} className='flex flex-col'>
+                  <CardHeader className='pb-2'>
+                    <div className='flex items-start justify-between gap-2'>
+                      <div className='min-w-0 flex-1'>
+                        <CardTitle className='truncate text-base'>{row.name}</CardTitle>
+                        <p className='text-muted-foreground mt-0.5 font-mono text-xs'>{row.clientType}</p>
+                      </div>
+                      <div className='flex shrink-0 items-center gap-2'>
+                        <span
+                          className={[
+                            'inline-block h-2 w-2 rounded-full',
+                            isOnline ? 'bg-green-500' : 'bg-muted-foreground/40'
+                          ].join(' ')}
+                          title={isOnline ? '在线' : '离线'}
+                        />
                         <Switch
                           checked={row.status === 'enabled'}
-                          disabled={Boolean(statusUpdating[row.id]) || row.status === 'archived'}
+                          disabled={Boolean(statusUpdating[row.id]) || isArchived}
                           onCheckedChange={(checked) => void setClientEnabled(row, checked)}
                         />
+                        {isArchived && (
+                          <Badge variant='secondary' className='text-xs'>已归档</Badge>
+                        )}
                       </div>
-                    </TableCell>
-                    <TableCell className='text-muted-foreground max-w-[280px] align-top whitespace-normal break-words text-sm'>
-                      {row.runStatus ?? '-'}
-                    </TableCell>
-                    <TableCell className='text-xs align-top'>
+                    </div>
+                    {row.description && (
+                      <p className='text-muted-foreground mt-1 line-clamp-2 text-xs'>{row.description}</p>
+                    )}
+                  </CardHeader>
+
+                  <CardContent className='flex-1 space-y-3 pb-3'>
+                    {/* Auth Key */}
+                    <div className='flex items-center gap-2'>
+                      <span className='text-muted-foreground w-14 shrink-0 text-xs'>Key</span>
+                      <span className='flex-1 truncate font-mono text-xs'>{maskKey(row.authKey)}</span>
+                    </div>
+
+                    {/* 最近心跳 */}
+                    <div className='flex items-center gap-2'>
+                      <span className='text-muted-foreground w-14 shrink-0 text-xs'>心跳</span>
+                      <span className='text-muted-foreground text-xs'>{formatDateTime(row.lastSeenAt)}</span>
+                    </div>
+
+                    {/* 运行状态 */}
+                    {row.runStatus && (
+                      <div className='flex items-center gap-2'>
+                        <span className='text-muted-foreground w-14 shrink-0 text-xs'>状态</span>
+                        <Badge variant={isOnline ? 'default' : 'outline'} className='text-xs'>
+                          {row.runStatus}
+                        </Badge>
+                      </div>
+                    )}
+
+                    {/* Skills 绑定 */}
+                    <div>
+                      <p className='text-muted-foreground mb-2 text-xs'>Skills</p>
                       {skillsLoading && skillBindingsLoading ? (
                         <span className='text-muted-foreground text-xs'>加载中…</span>
                       ) : !row.skills || row.skills.length === 0 ? (
                         <span className='text-muted-foreground text-xs'>未绑定</span>
                       ) : (
-                        <div className='flex max-w-[260px] flex-wrap gap-2'>
+                        <div className='flex flex-wrap gap-x-4 gap-y-2'>
                           {row.skills.map((binding) => (
-                            <div key={binding.id} className='inline-flex items-center gap-2'>
+                            <div key={binding.id} className='flex items-center gap-1.5'>
                               <span className='text-xs'>{binding.skillName}</span>
                               <Switch
                                 checked={binding.enabled}
+                                className='scale-[0.75]'
                                 onCheckedChange={async (checked) => {
                                   setSkillBindings((prev) =>
                                     prev.map((b) =>
@@ -584,9 +756,7 @@ export default function ClientsConfigViewPage() {
                                   );
                                   try {
                                     const response = await fetchWithTenantRefresh(
-                                      `/api/clients/${row.id}/skills/${encodeURIComponent(
-                                        binding.skillKey
-                                      )}`,
+                                      `/api/clients/${row.id}/skills/${encodeURIComponent(binding.skillKey)}`,
                                       {
                                         method: 'PATCH',
                                         headers: { 'Content-Type': 'application/json' },
@@ -607,13 +777,13 @@ export default function ClientsConfigViewPage() {
                                           prev.map((b) =>
                                             b.id === updated.id
                                               ? {
-                                                  ...b,
-                                                  enabled: Boolean(updated.enabled),
-                                                  orderNo:
-                                                    typeof updated.orderNo === 'number'
-                                                      ? updated.orderNo
-                                                      : b.orderNo
-                                                }
+                                                ...b,
+                                                enabled: Boolean(updated.enabled),
+                                                orderNo:
+                                                  typeof updated.orderNo === 'number'
+                                                    ? updated.orderNo
+                                                    : b.orderNo
+                                              }
                                               : b
                                           )
                                         );
@@ -632,36 +802,104 @@ export default function ClientsConfigViewPage() {
                           ))}
                         </div>
                       )}
-                    </TableCell>
-                    <TableCell className='font-mono text-xs'>{maskKey(row.authKey)}</TableCell>
-                    <TableCell className='text-xs'>{formatDateTime(row.lastSeenAt)}</TableCell>
-                    <TableCell className='text-right'>
-                      <div className='flex items-center justify-end gap-2'>
-                        <Button size='sm'  onClick={() => openEdit(row)}>
-                          编辑
-                        </Button>
-                        <Button
-                          size='sm'
-                          
-                          onClick={async () => {
-                            try {
-                              await navigator.clipboard.writeText(row.authKey);
-                            } catch {}
-                          }}
-                        >
-                          复制 key
-                        </Button>
-                        <Button size='sm'  onClick={() => void handleRotateKey(row)}>
-                          重置 key
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
-        </div>
+                    </div>
+
+                    {/* MCPs 绑定 */}
+                    <div>
+                      <p className='text-muted-foreground mb-2 text-xs'>MCPs</p>
+                      {mcpsLoading && mcpBindingsLoading ? (
+                        <span className='text-muted-foreground text-xs'>加载中…</span>
+                      ) : !row.mcps || row.mcps.length === 0 ? (
+                        <span className='text-muted-foreground text-xs'>未绑定</span>
+                      ) : (
+                        <div className='flex flex-wrap gap-x-4 gap-y-2'>
+                          {row.mcps.map((binding) => (
+                            <div key={binding.id} className='flex items-center gap-1.5'>
+                              <span className='text-xs'>{binding.mcpName}</span>
+                              <Switch
+                                checked={binding.isEnabled}
+                                className='scale-[0.75]'
+                                onCheckedChange={async (checked) => {
+                                  setMcpBindings((prev) =>
+                                    prev.map((b) =>
+                                      b.id === binding.id ? { ...b, isEnabled: checked } : b
+                                    )
+                                  );
+                                  try {
+                                    const response = await fetchWithTenantRefresh(
+                                      `/api/clients/${row.id}/mcps/${encodeURIComponent(binding.mcpKey)}`,
+                                      {
+                                        method: 'PATCH',
+                                        headers: { 'Content-Type': 'application/json' },
+                                        body: JSON.stringify({ isEnabled: checked })
+                                      }
+                                    );
+                                    if (!response.ok) {
+                                      setMcpBindings((prev) =>
+                                        prev.map((b) =>
+                                          b.id === binding.id ? { ...b, isEnabled: !checked } : b
+                                        )
+                                      );
+                                    } else {
+                                      const data = await response.json().catch(() => null);
+                                      const updated = data?.binding;
+                                      if (updated?.id) {
+                                        setMcpBindings((prev) =>
+                                          prev.map((b) =>
+                                            b.id === updated.id
+                                              ? {
+                                                ...b,
+                                                isEnabled: Boolean(updated.isEnabled)
+                                              }
+                                              : b
+                                          )
+                                        );
+                                      }
+                                    }
+                                  } catch {
+                                    setMcpBindings((prev) =>
+                                      prev.map((b) =>
+                                        b.id === binding.id ? { ...b, isEnabled: !checked } : b
+                                      )
+                                    );
+                                  }
+                                }}
+                              />
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </CardContent>
+
+                  <CardFooter className='flex flex-wrap gap-2 border-t pt-3'>
+                    <Button size='sm' variant='outline' className='flex-1' onClick={() => openEdit(row)}>
+                      编辑
+                    </Button>
+                    <Button
+                      size='sm'
+                      variant='outline'
+                      className='flex-1'
+                      onClick={async () => {
+                        try { await navigator.clipboard.writeText(row.authKey); } catch { }
+                      }}
+                    >
+                      复制 Key
+                    </Button>
+                    <Button
+                      size='sm'
+                      variant='outline'
+                      className='flex-1'
+                      onClick={() => void handleRotateKey(row)}
+                    >
+                      重置 Key
+                    </Button>
+                  </CardFooter>
+                </Card>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       <Dialog
@@ -734,6 +972,41 @@ export default function ClientsConfigViewPage() {
                 </div>
               </div>
               <div className='grid gap-2'>
+                <Label>绑定 MCPs</Label>
+                <div className='flex flex-wrap gap-2'>
+                  {mcpsLoading ? (
+                    <span className='text-muted-foreground text-xs'>加载中…</span>
+                  ) : mcps.length === 0 ? (
+                    <span className='text-muted-foreground text-xs'>当前租户暂无 MCPs</span>
+                  ) : (
+                    mcps.map((mcp) => {
+                      const checked = editMcpKeys.includes(mcp.mcpKey);
+                      return (
+                        <button
+                          key={mcp.mcpKey}
+                          type='button'
+                          className={cn(
+                            'rounded-full border px-3 py-1 text-xs',
+                            checked
+                              ? 'border-primary bg-primary text-primary-foreground'
+                              : 'border-border bg-background text-foreground'
+                          )}
+                          onClick={() => {
+                            setEditMcpKeys((prev) =>
+                              prev.includes(mcp.mcpKey)
+                                ? prev.filter((k) => k !== mcp.mcpKey)
+                                : [...prev, mcp.mcpKey]
+                            );
+                          }}
+                        >
+                          {mcp.name}
+                        </button>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+              <div className='grid gap-2'>
                 <Label>认证 Key</Label>
                 <div className='flex items-center gap-2'>
                   <Input value={editing.authKey} readOnly className='font-mono text-xs' />
@@ -742,7 +1015,7 @@ export default function ClientsConfigViewPage() {
                     onClick={async () => {
                       try {
                         await navigator.clipboard.writeText(editing.authKey);
-                      } catch {}
+                      } catch { }
                     }}
                   >
                     复制

@@ -42,11 +42,12 @@ type AgentIdentity = {
 // ── 发送请求拉取后台 llm-config.json ──────────────────────────────
 let cachedLlmConfig: LlmConfig | null = null
 let cachedIdentity: AgentIdentity | null = null
+let cachedMcpConfigs: Record<string, any> | null = null
 
-async function fetchLlmConfig(): Promise<{ llm: LlmConfig; identity: AgentIdentity } | null> {
+async function fetchLlmConfig(): Promise<{ llm: LlmConfig; identity: AgentIdentity; mcps: Record<string, any> } | null> {
     // 优先返回内存缓存
-    if (cachedLlmConfig && cachedIdentity) {
-        return { llm: cachedLlmConfig, identity: cachedIdentity }
+    if (cachedLlmConfig && cachedIdentity && cachedMcpConfigs) {
+        return { llm: cachedLlmConfig, identity: cachedIdentity, mcps: cachedMcpConfigs }
     }
 
     const authKey = readLocalAuthKey()
@@ -60,11 +61,14 @@ async function fetchLlmConfig(): Promise<{ llm: LlmConfig; identity: AgentIdenti
             headers: { Authorization: `Bearer ${authKey}` },
         })
         if (!res.ok) return null
+
         const json = await res.json() as {
             defaultConfig?: LlmConfig
             client?: { clientName?: string; clientType?: string; clientDescription?: string | null }
             tenant?: { name?: string }
+            mcps?: { mcpKey: string; config: Record<string, unknown> }[]
         }
+
         if (json.defaultConfig) {
             cachedLlmConfig = json.defaultConfig as LlmConfig
             cachedIdentity = {
@@ -73,9 +77,18 @@ async function fetchLlmConfig(): Promise<{ llm: LlmConfig; identity: AgentIdenti
                 clientDescription: json.client?.clientDescription ?? null,
                 tenantName: json.tenant?.name ?? '',
             }
+
+            const mcpsRecord: Record<string, any> = {}
+            if (Array.isArray(json.mcps)) {
+                json.mcps.forEach(mcp => {
+                    mcpsRecord[mcp.mcpKey] = mcp.config
+                })
+            }
+            cachedMcpConfigs = mcpsRecord
         }
-        return cachedLlmConfig && cachedIdentity
-            ? { llm: cachedLlmConfig, identity: cachedIdentity }
+
+        return cachedLlmConfig && cachedIdentity && cachedMcpConfigs
+            ? { llm: cachedLlmConfig, identity: cachedIdentity, mcps: cachedMcpConfigs }
             : null
     } catch (err) {
         console.error('[Agent] 获取 LLM 配置失败:', err)
@@ -87,6 +100,7 @@ async function fetchLlmConfig(): Promise<{ llm: LlmConfig; identity: AgentIdenti
 export function clearAgentLlmCache() {
     cachedLlmConfig = null
     cachedIdentity = null
+    cachedMcpConfigs = null
 }
 
 // ── 缓存 agent 实例与 LLM 配置 ──────────────────────────────────────
@@ -101,7 +115,7 @@ export async function getOrCreateAgent(): Promise<{ agent: NonNullable<typeof ag
     if (!result) {
         return { error: '未获取到 LLM 配置，请在设置中填写有效的客户端密钥' }
     }
-    const { llm: llmConfig, identity } = result
+    const { llm: llmConfig, identity, mcps } = result
     if (!llmConfig.apiKey) {
         return {
             error: 'LLM 配置中缺少 API Key'
@@ -140,7 +154,7 @@ export async function getOrCreateAgent(): Promise<{ agent: NonNullable<typeof ag
         inheritEnv: true,
     })
 
-    const tools = await initMcpTools()
+    const tools = await initMcpTools(mcps)
 
     agentInstance = createDeepAgent({
         model: llm,
