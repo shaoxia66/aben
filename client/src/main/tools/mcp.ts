@@ -16,10 +16,10 @@ export async function initMcpTools(serverConfigs: Record<string, any> = {}) {
     // 以及如果用户还想接入其他的比如 server-sqlite 等，都可以配在字面量里
     // 另外，我们将服务端下发的 MCP 服务端配置 (serverConfigs) 与本地静态配置做合并
     const configsToLoad = {
-        puppeteer: {
-            command: 'npx',
-            args: ['-y', '@modelcontextprotocol/server-puppeteer']
-        },
+        // puppeteer: {
+        //     command: 'npx',
+        //     args: ['-y', '@modelcontextprotocol/server-puppeteer']
+        // },
         ...serverConfigs
     }
 
