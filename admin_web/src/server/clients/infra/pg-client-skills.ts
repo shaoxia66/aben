@@ -170,3 +170,62 @@ export async function setClientSkillEnabled(
   };
 }
 
+/** client 认证接口下发的 skill 摘要（含 hasScripts 标记） */
+export type ClientSkillSummary = {
+  skillKey: string;
+  name: string;
+  description: string | null;
+  /** 该 skill 是否包含非 markdown 的可执行脚本文件（根据 content_type 判断） */
+  hasScripts: boolean;
+};
+
+/**
+ * 查询指定 client 已启用的 skills 摘要列表。
+ *
+ * hasScripts 通过检查 skills 表中该 skill_key 是否存在
+ * content_type 不以 'text/markdown' 开头的非根文件来判断。
+ */
+export async function getActiveSkillsForClient(
+  client: PoolClient,
+  params: { tenantId: string; clientId: string }
+): Promise<ClientSkillSummary[]> {
+  const result = await client.query<{
+    skill_key: string;
+    name: string | null;
+    description: string | null;
+    has_scripts: boolean;
+  }>(
+    [
+      "SELECT",
+      "  s.skill_key,",
+      "  s.name,",
+      "  s.description,",
+      // has_scripts: 检查同一 skill_key 下是否存在 content_type 不是 text/markdown 的文件
+      "  EXISTS (",
+      "    SELECT 1 FROM skills s2",
+      "    WHERE s2.tenant_id = s.tenant_id",
+      "      AND s2.skill_key = s.skill_key",
+      "      AND s2.path <> ''",
+      "      AND s2.content_type IS NOT NULL",
+      "      AND s2.content_type NOT LIKE 'text/markdown%'",
+      "  ) AS has_scripts",
+      "FROM skills s",
+      "JOIN client_skills cs",
+      "  ON cs.tenant_id = s.tenant_id",
+      " AND cs.skill_key = s.skill_key",
+      " AND cs.client_id = $2",
+      " AND cs.enabled = TRUE",
+      "WHERE s.tenant_id = $1",
+      "  AND s.path = ''",
+      "ORDER BY cs.order_no ASC, cs.created_at ASC",
+    ].join(" "),
+    [params.tenantId, params.clientId]
+  );
+
+  return result.rows.map((row) => ({
+    skillKey: row.skill_key,
+    name: row.name ?? row.skill_key,
+    description: row.description,
+    hasScripts: row.has_scripts,
+  }));
+}

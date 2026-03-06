@@ -10,6 +10,7 @@ import { readFileSync, existsSync } from 'node:fs'
 import { ChatOpenAI } from '@langchain/openai'
 import { createDeepAgent, LocalShellBackend } from 'deepagents'
 import { initMcpTools } from './tools/mcp'
+import { createSkillTools, type SkillSummary } from './tools/skills'
 
 // ── 读取本地密钥 ──────────────────────────────────────────────────
 function readLocalAuthKey(): string {
@@ -43,11 +44,12 @@ type AgentIdentity = {
 let cachedLlmConfig: LlmConfig | null = null
 let cachedIdentity: AgentIdentity | null = null
 let cachedMcpConfigs: Record<string, any> | null = null
+let cachedSkillSummaries: SkillSummary[] | null = null
 
-async function fetchLlmConfig(): Promise<{ llm: LlmConfig; identity: AgentIdentity; mcps: Record<string, any> } | null> {
+async function fetchLlmConfig(): Promise<{ llm: LlmConfig; identity: AgentIdentity; mcps: Record<string, any>; skills: SkillSummary[] } | null> {
     // 优先返回内存缓存
-    if (cachedLlmConfig && cachedIdentity && cachedMcpConfigs) {
-        return { llm: cachedLlmConfig, identity: cachedIdentity, mcps: cachedMcpConfigs }
+    if (cachedLlmConfig && cachedIdentity && cachedMcpConfigs && cachedSkillSummaries) {
+        return { llm: cachedLlmConfig, identity: cachedIdentity, mcps: cachedMcpConfigs, skills: cachedSkillSummaries }
     }
 
     const authKey = readLocalAuthKey()
@@ -67,6 +69,7 @@ async function fetchLlmConfig(): Promise<{ llm: LlmConfig; identity: AgentIdenti
             client?: { clientName?: string; clientType?: string; clientDescription?: string | null }
             tenant?: { name?: string }
             mcps?: { mcpKey: string; config: Record<string, unknown> }[]
+            skills?: { skillKey: string; name: string; description: string | null; hasScripts: boolean }[]
         }
 
         if (json.defaultConfig) {
@@ -85,10 +88,13 @@ async function fetchLlmConfig(): Promise<{ llm: LlmConfig; identity: AgentIdenti
                 })
             }
             cachedMcpConfigs = mcpsRecord
+
+            // 解析 skills 元数据
+            cachedSkillSummaries = Array.isArray(json.skills) ? json.skills : []
         }
 
-        return cachedLlmConfig && cachedIdentity && cachedMcpConfigs
-            ? { llm: cachedLlmConfig, identity: cachedIdentity, mcps: cachedMcpConfigs }
+        return cachedLlmConfig && cachedIdentity && cachedMcpConfigs && cachedSkillSummaries !== null
+            ? { llm: cachedLlmConfig, identity: cachedIdentity, mcps: cachedMcpConfigs, skills: cachedSkillSummaries }
             : null
     } catch (err) {
         console.error('[Agent] 获取 LLM 配置失败:', err)
@@ -101,6 +107,8 @@ export function clearAgentLlmCache() {
     cachedLlmConfig = null
     cachedIdentity = null
     cachedMcpConfigs = null
+    cachedSkillSummaries = null
+    agentInstance = null   // 强制下次重新创建 agent（skills 可能已变）
 }
 
 // ── 缓存 agent 实例与 LLM 配置 ──────────────────────────────────────
@@ -115,7 +123,7 @@ export async function getOrCreateAgent(): Promise<{ agent: NonNullable<typeof ag
     if (!result) {
         return { error: '未获取到 LLM 配置，请在设置中填写有效的客户端密钥' }
     }
-    const { llm: llmConfig, identity, mcps } = result
+    const { llm: llmConfig, identity, mcps, skills } = result
     if (!llmConfig.apiKey) {
         return {
             error: 'LLM 配置中缺少 API Key'
@@ -141,7 +149,15 @@ export async function getOrCreateAgent(): Promise<{ agent: NonNullable<typeof ag
         ? `\n\n关于你自己：${identity.clientDescription}`
         : ''
 
-    const systemPrompt = `你是 ${agentName}${tenantLabel}，一个运行在用户桌面的智能助手。${descriptionLine}`
+    // 构建 skills 提示段（渐进式披露：只列出名称和描述，内容按需加载）
+    const skillsPromptSection = skills.length > 0
+        ? `\n\n## 可用技能\n\n你有以下技能可以调用，当任务与某个技能相关时，先用 \`load_skill\` 获取详细指引：\n${skills.map(s => {
+            const tag = s.hasScripts ? '（含脚本，可用 run_skill_script 执行）' : ''
+            return `- **${s.name}** (\`${s.skillKey}\`): ${s.description ?? ''}${tag}`
+        }).join('\n')}\n`
+        : ''
+
+    const systemPrompt = `你是 ${agentName}${tenantLabel}，一个运行在用户桌面的智能助手。${descriptionLine}${skillsPromptSection}`
 
     // LocalShellBackend：完整本地 Shell 权限
     // - rootDir 作为 shell 命令的默认工作目录（用户主目录）
@@ -154,13 +170,15 @@ export async function getOrCreateAgent(): Promise<{ agent: NonNullable<typeof ag
         inheritEnv: true,
     })
 
-    const tools = await initMcpTools(mcps)
+    const mcpTools = await initMcpTools(mcps)
+    const skillTools = createSkillTools(skills)
+    const allTools: any[] = [...mcpTools, ...skillTools]
 
     agentInstance = createDeepAgent({
         model: llm,
         systemPrompt,
         backend,
-        tools
+        tools: allTools
     })
 
     console.log(`[Agent] 初始化完成 | 名称: ${agentName} | 租户: ${identity.tenantName} | provider: ${llmConfig.provider} | model: ${llmConfig.modelName} | backend: LocalShellBackend(${homeDir})`)

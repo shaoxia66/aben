@@ -3,6 +3,7 @@ import { requireClientAuth } from "@/server/auth/infra/require-client-auth";
 import { withTransaction } from "@/server/shared/db/pg";
 import { listLlmProviderConfigsByTenantId } from "@/server/llm-config/infra/pg-llm-provider-configs";
 import { getActiveMcpsForClient } from "@/server/clients/infra/pg-client-mcps";
+import { getActiveSkillsForClient } from "@/server/clients/infra/pg-client-skills";
 
 export const runtime = "nodejs";
 
@@ -42,11 +43,12 @@ export async function GET(request: Request) {
 
     const { tenantId, clientId, clientName, clientDescription, clientType, code } = auth.context;
 
-    // 2. 并行查：LLM 配置 + 租户名 + 启用的 MCP
-    const [configs, tenantName, mcps] = await Promise.all([
+    // 2. 并行查：LLM 配置 + 租户名 + 启用的 MCP + 启用的 Skills
+    const [configs, tenantName, mcps, skills] = await Promise.all([
         withTransaction(async (client) => listLlmProviderConfigsByTenantId(client, tenantId)),
         fetchTenantName(tenantId),
         withTransaction(async (client) => getActiveMcpsForClient(client, { tenantId, clientId })),
+        withTransaction(async (client) => getActiveSkillsForClient(client, { tenantId, clientId })),
     ]);
 
     const enabled = configs.filter((c) => c.status === "enabled");
@@ -85,9 +87,10 @@ export async function GET(request: Request) {
         },
         tenant: {
             id: tenantId,
-            name: tenantName,     // ← 租户名称
+            name: tenantName,
         },
         mcps,
+        skills,   // ← [{ skillKey, name, description, hasScripts }, ...]
         configs: result,
         defaultConfig: result.find((c) => c.isDefault) ?? result[0] ?? null,
     });
