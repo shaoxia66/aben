@@ -15,7 +15,8 @@
  * 1) 在 src/instrumentation.ts 的 register() 中（仅 nodejs runtime）调用：
  *    await ensureLangfuseOtelSdkStarted();
  * 2) 在任何 LangChain 调用处传 callbacks：
- *    await chain.invoke(input, { callbacks: [langfuseHandler] })
+ *    记录name字段可以直接加入runName字段 例如
+ *    await chain.invoke(input, { callbacks: [langfuseHandler] ，runName: `桌面助手`})
  *
  * 脚本/队列任务建议用法：
  * - 任务结束后调用 await shutdownLangfuseOtelSdk()，确保 trace flush 出去

@@ -231,6 +231,8 @@ export async function runDeepAgent(
             { messages: [{ role: 'user', content: message }] } as any,
             {
                 version: 'v2',
+                // @ts-ignore
+                runName: `桌面助手`,
                 // Langfuse CallbackHandler 在这里接入，自动追踪全链路
                 callbacks: langfuseCallbacks,
             }
