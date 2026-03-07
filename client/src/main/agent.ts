@@ -11,6 +11,7 @@ import { ChatOpenAI } from '@langchain/openai'
 import { createDeepAgent, LocalShellBackend } from 'deepagents'
 import { initMcpTools } from './tools/mcp'
 import { createSkillTools, type SkillSummary } from './tools/skills'
+import { createLangfuseHandler, logLangfuseStatus } from './langfuse'
 
 // ── 读取本地密钥 ──────────────────────────────────────────────────
 function readLocalAuthKey(): string {
@@ -45,6 +46,10 @@ let cachedLlmConfig: LlmConfig | null = null
 let cachedIdentity: AgentIdentity | null = null
 let cachedMcpConfigs: Record<string, any> | null = null
 let cachedSkillSummaries: SkillSummary[] | null = null
+
+// Langfuse 追踪用的 agent 身份信息（agent 创建后缓存）
+let _agentName = 'Aben'
+let _tenantName = ''
 
 async function fetchLlmConfig(): Promise<{ llm: LlmConfig; identity: AgentIdentity; mcps: Record<string, any>; skills: SkillSummary[] } | null> {
     // 优先返回内存缓存
@@ -181,6 +186,10 @@ export async function getOrCreateAgent(): Promise<{ agent: NonNullable<typeof ag
         tools: allTools
     })
 
+    // 缓存 identity 信息，供 runDeepAgent 创建 Langfuse trace 上下文时使用
+    _agentName = agentName
+    _tenantName = identity.tenantName ?? ''
+
     console.log(`[Agent] 初始化完成 | 名称: ${agentName} | 租户: ${identity.tenantName} | provider: ${llmConfig.provider} | model: ${llmConfig.modelName} | backend: LocalShellBackend(${homeDir})`)
     return { agent: agentInstance }
 }
@@ -204,13 +213,27 @@ export async function runDeepAgent(
 
     const agent = result.agent
 
+    // 为本次对话创建 Langfuse handler（每次对话独立，携带 sessionId 用于追踪归组）
+    // sessionId 用消息内容的哈希 + 时间戳简单生成，保证同一会话的追踪可以在 Langfuse 中聚合
+    const sessionId = `${_agentName}-${Date.now()}`
+    const langfuseHandler = createLangfuseHandler({
+        sessionId,
+        agentName: _agentName,
+        tenantName: _tenantName,
+    })
+    const langfuseCallbacks = langfuseHandler ? [langfuseHandler] : []
+
     try {
         console.log('[Agent] 收到指令:', message.slice(0, 60))
 
-        // @ts-ignore - Bypass deepagents strict tuple type checking 
+        // @ts-ignore - Bypass deepagents strict tuple type checking
         const eventStream = agent!.streamEvents(
             { messages: [{ role: 'user', content: message }] } as any,
-            { version: 'v2' }
+            {
+                version: 'v2',
+                // Langfuse CallbackHandler 在这里接入，自动追踪全链路
+                callbacks: langfuseCallbacks,
+            }
         )
 
         for await (const event of eventStream) {
@@ -257,6 +280,9 @@ export async function runDeepAgent(
 
 // ── IPC: chat:send（streaming） ───────────────────────────────────
 export function registerAgentIpc() {
+    // 候应用启动时打印一次 Langfuse 状态
+    logLangfuseStatus()
+
     ipcMain.removeHandler('agent:send')
     ipcMain.handle('agent:send', async (event, payload: { message: string; threadId?: string }) => {
         const { message } = payload

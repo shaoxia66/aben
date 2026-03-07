@@ -51,11 +51,15 @@ async function ensureLangfuseOtelSdkStarted() {
 
   if (secretKey && publicKey && !globalForLangfuse.__langfuseSdkStarted) {
     const sdk = new NodeSDK({
+      instrumentations: [], // 关闭默认全局的所有自动收集探针（比如 node:http 等）
       spanProcessors: [
         new LangfuseSpanProcessor({
           secretKey,
           publicKey,
-          ...(baseUrl ? { baseUrl } : {})
+          ...(baseUrl ? { baseUrl } : {}),
+          shouldExportSpan: ({ otelSpan }) => {
+            return ['langfuse-sdk', 'ai'].includes(otelSpan.instrumentationScope.name);
+          }
         })
       ]
     });

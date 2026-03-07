@@ -18,8 +18,16 @@ const tsconfigPaths = tsconfigPathsPlugin({
 })
 
 export default defineConfig(({ mode }) => {
-  const env = loadEnv(mode, process.cwd())
+  // 使用第三个参数 '' 能够加载 .env 中的所有变量（不限于 VITE_ 开头）
+  const env = loadEnv(mode, process.cwd(), '')
   const adminApiUrl = env.VITE_ADMIN_API_URL ?? ''
+
+  // Langfuse 变量（无 VITE_ 前缀，通过 define 注入主进程）
+  const langfuseSecretKey = env.LANGFUSE_SECRET_KEY ?? process.env.LANGFUSE_SECRET_KEY ?? ''
+  const langfusePublicKey = env.LANGFUSE_PUBLIC_KEY ?? process.env.LANGFUSE_PUBLIC_KEY ?? ''
+  const langfuseBaseUrl = env.LANGFUSE_BASE_URL ?? process.env.LANGFUSE_BASE_URL ?? ''
+
+  console.log('[DEBUG-VITE-CONFIG] SecKey:', !!langfuseSecretKey, 'PubKey:', !!langfusePublicKey)
 
   // 把关键环境变量写回 process.env，这样 Electron 子进程可以直接继承读到
   if (adminApiUrl) {
@@ -34,6 +42,10 @@ export default defineConfig(({ mode }) => {
       define: {
         'import.meta.env.VITE_ADMIN_API_URL': JSON.stringify(adminApiUrl),
         'process.env.VITE_ADMIN_API_URL': JSON.stringify(adminApiUrl),
+        // Langfuse 追踪配置（注入主进程 process.env）
+        'process.env.LANGFUSE_SECRET_KEY': JSON.stringify(langfuseSecretKey),
+        'process.env.LANGFUSE_PUBLIC_KEY': JSON.stringify(langfusePublicKey),
+        'process.env.LANGFUSE_BASE_URL': JSON.stringify(langfuseBaseUrl),
       },
 
       build: {
